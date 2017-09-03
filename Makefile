@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 PKG := github.com/dh1tw/remoteRotator
 COMMITID := $(shell git describe --always --long --dirty)
 COMMIT := $(shell git rev-parse --short HEAD)
@@ -13,8 +15,11 @@ build:
 		-X github.com/dh1tw/remoteRotator/cmd.version=${VERSION}"
 
 # strip off dwraf table - used for travis CI
-dist: 
+
+generate:
 	go generate ./...
+
+dist: 
 	go build -v -ldflags="-w -X github.com/dh1tw/remoteRotator/cmd.commitHash=${COMMIT} \
 		-X github.com/dh1tw/remoteRotator/cmd.version=${VERSION}"
 
@@ -57,4 +62,4 @@ server: build
 clean:
 	-@rm remoteRotator remoteRotator-v*
 
-.PHONY: build server install vet lint clean install-deps
+.PHONY: build server install vet lint clean install-deps generate

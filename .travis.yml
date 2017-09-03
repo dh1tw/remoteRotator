@@ -8,6 +8,11 @@ matrix:
     - GIMME_OS=linux
     - GIMME_ARCH=amd64
     go: 1.8
+  - os: linux
+    env:
+    - GIMME_OS=linux
+    - GIMME_ARCH=arm
+    go: 1.8  
   - os: osx
     env:
     - GIMME_OS=darwin
@@ -15,15 +20,17 @@ matrix:
     go: 1.8
 before_install:
 - git fetch --tags
-- go get golang.org/x/tools/cmd/stringer
-- go get github.com/mattn/goveralls
+- GOARCH=amd64 go get golang.org/x/tools/cmd/stringer
+- GOARCH=amd64 go get github.com/mattn/goveralls
 script:
-- go get ./...
-- $HOME/gopath/bin/goveralls -service=travis-ci
-- make test
-- make dist
+- GOARCH=$GIMME_ARCH GOOS=$GIMME_OS go get ./...
+- GOARCH=$GIMME_ARCH GOOS=$GIMME_OS ./ci/test.sh
+- GOARCH=amd64 make generate
+- GOARCH=$GIMME_ARCH GOOS=$GIMME_OS make dist
+- file remoteRotator
 before_deploy:
 - tar -cvzf remoteRotator-v$TRAVIS_TAG-$GIMME_OS-$GIMME_ARCH.tar.gz remoteRotator
+
 deploy:
   provider: releases
   api_key:
@@ -35,3 +42,47 @@ deploy:
     tags: true
     draft: true
     go: 1.8
+
+# language: go
+# dist: trusty
+# sudo: true
+# matrix:
+#   include:
+#   - os: linux
+#     env:
+#     - GOOS=linux GOARCH=amd64
+#     go: 1.8
+#   - os: linux
+#     env:
+#     - GOOS=linux GOARCH=arm
+#     go: 1.8
+#   - os: linux
+#     env:
+#     - GOOS=linux GOARCH=arm64
+#     go: 1.8
+#   - os: osx
+#     env:
+#     - GOOS=darwin GOARCH=amd64
+#     go: 1.8
+# before_install:
+# - git fetch --tags
+# - go get golang.org/x/tools/cmd/stringer
+# - go get github.com/mattn/goveralls
+# script:
+# - go get ./...
+# - ./ci/test.sh
+# - make dist
+# - file remoteRotator
+# before_deploy:
+# - tar -cvzf remoteRotator-v$TRAVIS_TAG-$GOOS-$GOARCH.tar.gz remoteRotator
+# deploy:
+#   provider: releases
+#   api_key:
+#     secure: BWX1PUIiHuie4Db0FNmQANqA9pHwyzXnJCQ7GQRydnZ3jEf3oHABvuBvXtYCjf7cMvdmG81CLNtQXkPqpDfC4YW/r1LDbK1mN2YT+X3KIs+Qwhi7Y1yrNqLQtjj4gofE0rBt7jSTjxIZn9NN/Zx0iPv6LLIRWLWZ2SSdIKNIqAHFz4CTcdZflmgQKtjEKf3gtdi57oVC/NsObadmil5ojFBnX/5mG2ZVUsST56YlUrxdO8HOunsQyxuip84Gm6KgxdJTy4m74DhdG6odqKC4ifnKCTQ6+/MX0vLJI30WttSsDqBbcdUTt6/dlMD8Lb8RDr/2b9kqYAkUt0xEUdmWJropk93zPTAPEAFeAIg2QTCMGfUdb9YChLOw6yCT/LIQcBmkQ8iQMfUZWvJP1IKFNWfu3SBh4CnuKSfwdOzXWOMl+/jBJYUHZo/pVE+R7vBKxTMGJMaxM1hFSOrJBiGi0zezh+4IFGAabLtmvCOPHllKSi5Sn7XuqQz4xbVGcFlFG6uCrAL1JRPQPD4CHy1xpRhZCIlrHXQMeqBbZSrjYcszSTbAjagwWcqR1veoqkhaeNL+VeQ1QKfeHM1X4bbnELeQsLZTSQ6GwJHW7xpsx1AKPFu+jJqaW9hMFkLnlv0gcYA+iHM+HPsubEPvFkP0R5vrpl+kwybx0zJJ6hSuMPU=
+#   file: remoteRotator-v$TRAVIS_TAG-$GOOS-$GOARCH.tar.gz
+#   skip_cleanup: true
+#   on:
+#     repo: dh1tw/remoteRotator
+#     tags: true
+#     draft: true
+#     go: 1.8
