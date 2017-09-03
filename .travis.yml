@@ -18,6 +18,7 @@ before_install:
 - go get golang.org/x/tools/cmd/stringer
 - go get github.com/mattn/goveralls
 script:
+- go get ./...
 - $HOME/gopath/bin/goveralls -service=travis-ci
 - make test
 - make dist
