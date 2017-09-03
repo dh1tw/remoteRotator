@@ -2,23 +2,20 @@ language: go
 dist: trusty
 sudo: true
 matrix:
-  include: 
-    - os: linux
-      env: 
-        - GIMME_OS=linux 
-        - GIMME_ARCH=amd64
-      go: 1.8
-    - os: osx
-      env: 
-        - GIMME_OS=darwin
-        - GIMME_ARCH=amd64
-      go: 1.8
-# cache:
-#   directories:
-#   - $HOME/protobuf
+  include:
+  - os: linux
+    env:
+    - GIMME_OS=linux
+    - GIMME_ARCH=amd64
+    go: 1.8
+  - os: osx
+    env:
+    - GIMME_OS=darwin
+    - GIMME_ARCH=amd64
+    go: 1.8
 before_install:
-  - git fetch --tags
-  - go get github.com/mattn/goveralls
+- git fetch --tags
+- go get github.com/mattn/goveralls
 script:
 - $HOME/gopath/bin/goveralls -service=travis-ci
 - make test
@@ -33,7 +30,8 @@ deploy:
   skip_cleanup: true
   on:
     repo: dh1tw/remoteRotator
-    tags:
-      true
+    tags: true
     draft: true
     go: 1.8
+  password:
+    secure: JT9RgbWnH+xGT5HWiYSus07rPBtTB9zWbxNoj6XfPrGzC9H1BitquCT1j1QYetejMYp9+DKaouthDpt2m6hynWWcWC7YhR3Bx8cFz3X6DOsYMDp0i3QPYDVxLC4RJcQSDBXgGLsc6jHVUikA45XxrZby2aJ7KWdlpU8fMZQ5UaC9Cqp/+R5AOEKWq/1VVV4Rym0P9yq4Thq49nkrTkI/ovO8pCfdy60Rk3to/Nsl621Yf+RS5ahEDgBCJLGcCvfnT46AIgxkhDol6KpzEZuTZ5v+HNR1TNrB6fvXDnxIn8QWMO03mggLpsw77/kOpFpZR2k5lSf2foovoHKm1L0yDNRDDUK6VQS0EtBfRwl639JNpg8vaoYIVNq+oI1hq0O40ABeHyPwrE/C0BC4Yb/K6YRln35aDUinrY6SBkt3blC5Ufz0gvj/KaL/2+4sFYUMxXJ8nOzeJXnjGoxNFfP4i0LMnuT4BDtTU4l0w2EMq/NmTAPiiDM5Whb8ajoPVDK3tcF0++vPM+eXAeG3MSZa7+4NU/o6iin9UKDZuINavePmaBKCG3YyIhScCv0YioM3ZupycU37VrfN3kAyVJpdAoOQ0Q4QAgSbbym2Xb2+LiT8qltP6MpkC9CO27H98wkLqA81gDQxoLjbtmD2lfz3mX89VWHFWsNduxivOAf4VdQ=
