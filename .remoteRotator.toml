@@ -1,0 +1,12 @@
+[tcp]
+host = "127.0.0.1"
+port = 3333
+
+[rotator]
+type = "ARS"
+name = "myRotator"
+portname = "/dev/ttyACM0"
+baudrate = 9600
+has-azimuth = true
+has-elevation = false
+pollingrate = "1s"
