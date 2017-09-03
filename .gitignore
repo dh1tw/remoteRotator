@@ -1,2 +1,5 @@
 remoteRotator
 *.exe
+*.zip
+*.tar.gz
+*.tgz
