@@ -60,7 +60,7 @@ type apiCallCounter struct {
 // This test will spin up 1000 go routines and call randomly all available
 // Methods of the Ars object. The intention of this test is to detect any
 // race conditions which could happen due to the concurrent access.
-// A summary of the API calls and transfered bytes (rx/tx) after a successful
+// A summary of the API calls and transferred bytes (rx/tx) after a successful
 // pass.
 func TestArsMassiveConcurrentCalls(t *testing.T) {
 	dp := &randPort{}

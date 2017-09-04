@@ -168,7 +168,7 @@ func (r *Ars) checkWatchdog() bool {
 
 // Start starts the main event loop for the serial port.
 // It will query the ARS for the current heading (azimuth + elevation)
-// with the pollingrate defined during initalization.
+// with the pollingrate defined during initialization.
 // A watchdog detects if the ARS does not respond anymore. Since this
 // function runs in an endless loop, it is typically executed in a
 // go routine.
