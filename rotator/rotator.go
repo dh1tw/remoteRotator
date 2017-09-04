@@ -5,6 +5,7 @@ package rotator
 // Event represents events which are emitted from the rotator
 type Event int
 
+// Events send from a rotator
 const (
 	Azimuth   Event = iota // int
 	Elevation              // int
