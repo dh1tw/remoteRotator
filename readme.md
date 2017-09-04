@@ -5,8 +5,9 @@
 
 remoteRotator is a cross platform application which makes your antenna rotators
 available on the network. remoteRotator implements a statemachine which will
-query in a defineable interval the heading (azimuth and/or elevation) of the rotator. Updates are sent to all connected clients which can also execute commands at
-any time.
+query in a defineable interval the heading (azimuth and/or elevation) of the 
+rotator. Updates are sent to all connected clients which can also execute 
+commands at any time.
 
 remoteRotator is written in the programing language [Go](https://golang.org).
 
@@ -28,8 +29,8 @@ remoteRadio is published under the permissive [MIT license](https://github.com/d
 
 ## Download
 
-You can download a tarball / zip archive with the compiled binary for MacOS,
-Linux (386/AMD64/ARM/ARM64) and Windows (386/ARM64) from the
+You can download a tarball / zip archive with the compiled binary for MacOS
+(AMD64), Linux (386/AMD64/ARM/ARM64) and Windows (386/AMD64) from the
 [releases](https://github.com/dh1tw/remoteRotator/releases) page. remoteRotator
 is just a single executable.
 
@@ -39,12 +40,12 @@ remoteRotator does not have any external dependencies.
 
 ## Getting started
 
-Indentify the serial port to which your rotator is connected to. On Windows
+Identify the serial port to which your rotator is connected. On Windows
 this will be something like COMx (e.g. COM3), on Linux / MacOS it will be
 a device in the `/dev/` folder (e.g. /dev/ttyACM0).
 
-All parameters call set either in a config file (see below) or through pflags.
-To get a list of supported flags for the tcp server execute:
+All parameters can be set either in a config file (see below) or through pflags.
+To get a list of supported flags for the tcp server, execute:
 
 ```bash
 $ remoteRotator server tcp --help
@@ -72,8 +73,8 @@ Global Flags:
       --config string   config file (default is $HOME/.remoteRotator.yaml)
 ```
 
-So in order to launch remoteRotator on windows with an ARS connected at COM3 
-and having the server listening on the network, port 5050 we would call:
+So in order to launch remoteRotator on Windows with an ARS connected at COM3
+and having the server listening on the network port 5050, we would call:
 
 ```bash
 $ remoteRotator server tcp -u "0.0.0.0" -p 5050 -P "COM3"
@@ -87,9 +88,10 @@ Listening on 0.0.0.0:5050 for TCP connections
 ## Config file
 
 The repository contains an example configuration file. By convention it is called
-`.remoteRotator.[yaml|toml|json]` and is located by default in either in the 
+`.remoteRotator.[yaml|toml|json]` and is located by default either in the
 home directory or the directory where the remoteRotator executable is located.
-The format of the file can either be in [yaml](https://en.wikipedia.org/wiki/YAML),
+The format of the file can either be in
+[yaml](https://en.wikipedia.org/wiki/YAML),
 [toml](https://github.com/toml-lang/toml), or
 [json](https://en.wikipedia.org/wiki/JSON).
 
@@ -129,6 +131,11 @@ $ remoteRotator version
 copyright Tobias Wellnitz, DH1TW, 2017
 remoteRotator Version: 0.1.0, darwin/amd64, BuildDate: 2017-09-04T00:58:00+02:00, Commit: 338ff13
 ```
+
+## Documentation
+
+The auto generated documentation can be found at
+[godoc.org](https://godoc.org/github.com/dh1tw/remoteRotator).
 
 ## How to build
 
