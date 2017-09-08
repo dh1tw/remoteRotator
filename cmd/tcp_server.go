@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	b64 "encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -8,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/mdns"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -27,15 +30,22 @@ var tcpServerCmd = &cobra.Command{
 func init() {
 	serverCmd.AddCommand(tcpServerCmd)
 
-	tcpServerCmd.Flags().StringP("host", "u", "127.0.0.1", "Host (use '0.0.0.0' for public access)")
+	tcpServerCmd.Flags().StringP("host", "u", "127.0.0.1", "Host (use '0.0.0.0' to listen on all network adapters)")
 	tcpServerCmd.Flags().IntP("port", "p", 7373, "TCP Port")
 	tcpServerCmd.Flags().StringP("portname", "P", "/dev/ttyACM0", "portname / path to the rotator (e.g. COM1)")
 	tcpServerCmd.Flags().IntP("baudrate", "b", 9600, "baudrate")
 	tcpServerCmd.Flags().StringP("type", "t", "ARS", "Rotator type (supported: ARS")
 	tcpServerCmd.Flags().StringP("name", "n", "myRotator", "Name tag for the rotator")
+	tcpServerCmd.Flags().StringP("description", "d", "Yaesu G1000 with 4el 20m Yagi@18m ASL", "Description")
 	tcpServerCmd.Flags().BoolP("has-azimuth", "", true, "Indicate if the rotator supports Azimuth")
 	tcpServerCmd.Flags().BoolP("has-elevation", "", false, "Indicate if the rotator supports Elevation")
 	tcpServerCmd.Flags().DurationP("pollingrate", "", time.Second*1, "rotator polling rate")
+	tcpServerCmd.Flags().BoolP("discovery", "", true, "enable rotator discovery for web server")
+	tcpServerCmd.Flags().IntP("azimuth-min", "", 0, "metadata: minimum azimuth (in deg)")
+	tcpServerCmd.Flags().IntP("azimuth-max", "", 450, "metadata: maximum azimuth (in deg)")
+	tcpServerCmd.Flags().IntP("azimuth-stop", "", 0, "metadata: mechanical azimuth stop (in deg)")
+	tcpServerCmd.Flags().IntP("elevation-min", "", 0, "metadata: minimum elevation (in deg)")
+	tcpServerCmd.Flags().IntP("elevation-max", "", 180, "metadata: maximum elevation (in deg)")
 }
 
 func tcpServer(cmd *cobra.Command, args []string) {
@@ -65,9 +75,16 @@ func tcpServer(cmd *cobra.Command, args []string) {
 	viper.BindPFlag("rotator.baudrate", cmd.Flags().Lookup("baudrate"))
 	viper.BindPFlag("rotator.type", cmd.Flags().Lookup("type"))
 	viper.BindPFlag("rotator.name", cmd.Flags().Lookup("name"))
+	viper.BindPFlag("rotator.description", cmd.Flags().Lookup("description"))
 	viper.BindPFlag("rotator.has-azimuth", cmd.Flags().Lookup("has-azimuth"))
 	viper.BindPFlag("rotator.has-elevation", cmd.Flags().Lookup("has-elevation"))
 	viper.BindPFlag("rotator.pollingrate", cmd.Flags().Lookup("pollingrate"))
+	viper.BindPFlag("rotator.discovery", cmd.Flags().Lookup("discovery"))
+	viper.BindPFlag("rotator.azimuth-min", cmd.Flags().Lookup("azimuth-min"))
+	viper.BindPFlag("rotator.azimuth-max", cmd.Flags().Lookup("azimuth-max"))
+	viper.BindPFlag("rotator.azimuth-stop", cmd.Flags().Lookup("azimuth-stop"))
+	viper.BindPFlag("rotator.elevation-min", cmd.Flags().Lookup("elevation-min"))
+	viper.BindPFlag("rotator.elevation-max", cmd.Flags().Lookup("elevation-max"))
 
 	// go func() {
 	// 	log.Println(http.ListenAndServe("0.0.0.0:6060", http.DefaultServeMux))
@@ -117,6 +134,41 @@ func tcpServer(cmd *cobra.Command, args []string) {
 	tcpError := make(chan bool)
 	go h.ListenTCP(viper.GetString("tcp.host"), viper.GetInt("tcp.port"), tcpError)
 
+	wsError := make(chan bool)
+
+	if viper.GetBool("rotator.discovery") {
+
+		i := rotator.Info{
+			Name:         viper.GetString("rotator.name"),
+			Description:  viper.GetString("rotator.description"),
+			HasAzimuth:   viper.GetBool("rotator.has-azimuth"),
+			HasElevation: viper.GetBool("rotator.has-elevation"),
+			AzimuthMin:   viper.GetInt("rotator.azimuth-min"),
+			AzimuthMax:   viper.GetInt("rotator.azimuth-max"),
+			AzimuthStop:  viper.GetInt("rotator.azimuth-stop"),
+			ElevationMin: viper.GetInt("rotator.elevation-min"),
+			ElevationMax: viper.GetInt("rotator.elevation-max"),
+		}
+
+		info, err := encodeInfo(i)
+		if err != nil {
+			fmt.Printf("unable to marshal rotator description: %s\n", err)
+			return
+		}
+
+		mDNSService, err := mdns.NewMDNSService(viper.GetString("rotator.name"),
+			"rotators.shackbus", "", "", 7375, nil, []string{info})
+
+		if err != nil {
+			fmt.Printf("unable to start mDNS discovery service: %v", err)
+			return
+		}
+		mDNSServer, _ := mdns.NewServer(&mdns.Config{Zone: mDNSService})
+		defer mDNSServer.Shutdown()
+
+		go h.ListenWS(viper.GetString("tcp.host"), 7070, wsError)
+	}
+
 	for {
 		select {
 		case sig := <-osSignals:
@@ -130,7 +182,19 @@ func tcpServer(cmd *cobra.Command, args []string) {
 			return
 		case <-tcpError:
 			return
+		case <-wsError:
+			return
 		}
 	}
 
+}
+
+func encodeInfo(i rotator.Info) (string, error) {
+	res, err := json.Marshal(i)
+	if err != nil {
+		return "", err
+	}
+
+	uEnc := b64.URLEncoding.EncodeToString(res)
+	return uEnc, nil
 }

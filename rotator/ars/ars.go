@@ -444,12 +444,39 @@ func (r *Ars) Serialize() rotator.Status {
 	r.Lock()
 	defer r.Unlock()
 	return rotator.Status{
-		Name:         r.name,
-		HasElevation: r.hasElevation,
-		HasAzimuth:   r.hasAzimuth,
-		Azimuth:      r.azimuth,
-		AzPreset:     r.azPreset,
-		Elevation:    r.elevation,
-		ElPreset:     r.elPreset,
+		Name:      r.name,
+		Azimuth:   r.azimuth,
+		AzPreset:  r.azPreset,
+		Elevation: r.elevation,
+		ElPreset:  r.elPreset,
 	}
+}
+
+// ExecuteRequest takes a request struct and sets the new values
+func (r *Ars) ExecuteRequest(req rotator.Request) error {
+	if req.HasAzimuth {
+		if err := r.SetAzimuth(req.Azimuth); err != nil {
+			return err
+		}
+	}
+
+	if req.HasElevation {
+		if err := r.SetElevation(req.Elevation); err != nil {
+			return err
+		}
+	}
+
+	if req.StopAzimuth {
+		if err := r.StopAzimuth(); err != nil {
+			return err
+		}
+	}
+
+	if req.StopElevation {
+		if err := r.StopElevation(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
