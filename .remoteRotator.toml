@@ -1,6 +1,15 @@
 [tcp]
+enabled = true
 host = "127.0.0.1"
 port = 3333
+
+[http]
+enabled = true
+host = "127.0.0.1"
+port = 7070
+
+[discovery]
+enabled = true
 
 [rotator]
 type = "ARS"
@@ -10,3 +19,8 @@ baudrate = 9600
 has-azimuth = true
 has-elevation = false
 pollingrate = "1s"
+azimuth-min = 0
+azimuth-max = 450
+azimuth-stop = 0
+elevation-min = 0
+elevation-max = 180
