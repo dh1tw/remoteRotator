@@ -19,6 +19,12 @@ import (
 type Ars struct {
 	sync.Mutex
 	name            string
+	description     string
+	azimuthMin      int
+	azimuthMax      int
+	azimuthStop     int
+	elevationMin    int
+	elevationMax    int
 	azimuth         int
 	azPreset        int
 	elevation       int
@@ -88,6 +94,41 @@ func Portname(pn string) func(*Ars) {
 	}
 }
 
+// AzimuthMin is a functional option to set the minimum azimuth angle.
+func AzimuthMin(min int) func(*Ars) {
+	return func(r *Ars) {
+		r.azimuthMin = min
+	}
+}
+
+// AzimuthMax is a functional option to set the maximum azimuth angle.
+func AzimuthMax(max int) func(*Ars) {
+	return func(r *Ars) {
+		r.azimuthMax = max
+	}
+}
+
+// AzimuthStop is a functional option to set the mechanical stop of the rotator.
+func AzimuthStop(stop int) func(*Ars) {
+	return func(r *Ars) {
+		r.azimuthStop = stop
+	}
+}
+
+// ElevationMin is a functional option to set the minimum elevation angle.
+func ElevationMin(min int) func(*Ars) {
+	return func(r *Ars) {
+		r.elevationMin = min
+	}
+}
+
+// ElevationMax is a functional option to set the maximum elevation angle.
+func ElevationMax(max int) func(*Ars) {
+	return func(r *Ars) {
+		r.elevationMax = max
+	}
+}
+
 // NewArs creates a new Ars object which satisfies the rotator.Rotator interface.
 // Configuration settings are set through functional options. The the Ars
 // can not be initialized nil and the corresponding error will be returned.
@@ -110,6 +151,8 @@ func NewArs(opts ...func(*Ars)) (*Ars, error) {
 		spPortName:      "/dev/ttyACM0",
 		spBaudrate:      9600,
 		headingPattern:  headingPattern,
+		azimuthMax:      450,
+		elevationMax:    180,
 	}
 
 	for _, opt := range opts {
@@ -479,4 +522,22 @@ func (r *Ars) ExecuteRequest(req rotator.Request) error {
 	}
 
 	return nil
+}
+
+func (r *Ars) Info() rotator.Info {
+	r.Lock()
+	defer r.Unlock()
+
+	info := rotator.Info{
+		Name:         r.name,
+		Description:  r.description,
+		HasAzimuth:   r.hasAzimuth,
+		HasElevation: r.hasElevation,
+		AzimuthMin:   r.azimuthMin,
+		AzimuthMax:   r.azimuthMax,
+		AzimuthStop:  r.azimuthStop,
+		ElevationMin: r.elevationMin,
+		ElevationMax: r.elevationMax,
+	}
+	return info
 }

@@ -27,7 +27,7 @@ func (c *WsClient) listen(r rotator.Rotator, closer chan<- *WsClient) {
 			return
 		}
 
-		if messageType != websocket.BinaryMessage {
+		if messageType != websocket.TextMessage {
 			continue
 		}
 
@@ -48,11 +48,12 @@ func (c *WsClient) write(v interface{}) error {
 
 	switch t := v.(type) {
 	case rotator.Status:
-		b, err := json.Marshal(v.(rotator.Status))
+		s := []rotator.Status{v.(rotator.Status)}
+		b, err := json.Marshal(s)
 		if err != nil {
 			return fmt.Errorf("unable to serialize msg %v: %v", v, err)
 		}
-		if err := c.WriteMessage(websocket.BinaryMessage, b); err != nil {
+		if err := c.WriteMessage(websocket.TextMessage, b); err != nil {
 			return err
 		}
 	default:

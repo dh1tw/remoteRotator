@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/GeertJohan/go.rice"
+
 	"github.com/dh1tw/remoteRotator/rotator"
 	"github.com/gorilla/websocket"
 )
@@ -141,7 +143,6 @@ func (hub *Hub) wsHandler(w http.ResponseWriter, r *http.Request) {
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 	}
-
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
@@ -151,18 +152,39 @@ func (hub *Hub) wsHandler(w http.ResponseWriter, r *http.Request) {
 	c := &WsClient{
 		Conn: conn,
 	}
+
+	s := hub.rotator.Serialize()
+	c.write(s)
+
 	hub.AddWsClient(c)
 }
 
-// ListenWS starts a Websocket listener on a given network adapter / port.
+func (hub *Hub) infoHandler(w http.ResponseWriter, r *http.Request) {
+	i := []rotator.Info{hub.rotator.Info()}
+
+	data, err := json.Marshal(i)
+	if err != nil {
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, string(data))
+}
+
+// ListenHTTP starts a HTTP Server on a given network adapter / port and
+// sets a HTTP and Websocket handler.
 // Since this function contains an endless loop, it should be executed
 // in a go routine. If the listener can not be initialized, it will
 // close the wsError channel.
-func (hub *Hub) ListenWS(host string, port int, wsError chan<- bool) {
+func (hub *Hub) ListenHTTP(host string, port int, wsError chan<- bool) {
 
 	defer close(wsError)
 
-	// http.HandleFunc("/", handler)
+	box := rice.MustFindBox("../html")
+	fileServer := http.FileServer(box.HTTPBox())
+
+	http.Handle("/", fileServer)
+	http.HandleFunc("/info", hub.infoHandler)
 	http.HandleFunc("/ws", hub.wsHandler)
 
 	// Listen for incoming connections.
@@ -210,13 +232,8 @@ func (hub *Hub) BroadcastToWsClients(s rotator.Status) error {
 	hub.Lock()
 	defer hub.Unlock()
 
-	msg, err := json.Marshal(s)
-	if err != nil {
-		return err
-	}
-
 	for c := range hub.wsClients {
-		if err := c.WriteMessage(websocket.BinaryMessage, msg); err != nil {
+		if err := c.write(s); err != nil {
 			log.Printf("error writing to client %v: %v\n", c.RemoteAddr(), err)
 			log.Printf("disconnecting client %v\n", c.RemoteAddr())
 			c.Close()

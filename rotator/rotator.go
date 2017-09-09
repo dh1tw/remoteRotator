@@ -27,16 +27,17 @@ type Rotator interface {
 	Stop() error
 	Serialize() Status
 	ExecuteRequest(Request) error
+	Info() Info
 }
 
 // Status contains the current information from a rotator. The struct
 // can be converted into a JSON object.
 type Status struct {
 	Name      string `json:"name"`
-	Azimuth   int    `json:"azimuth,omitempty"`
-	AzPreset  int    `json:"az_preset,omitempty"`
-	Elevation int    `json:"elevation,omitempty"`
-	ElPreset  int    `json:"el_preset,omitempty"`
+	Azimuth   int    `json:"azimuth"`
+	AzPreset  int    `json:"az_preset"`
+	Elevation int    `json:"elevation"`
+	ElPreset  int    `json:"el_preset"`
 }
 
 // Request contains the fields to control a rotator.

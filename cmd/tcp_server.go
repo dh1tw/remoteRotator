@@ -150,7 +150,7 @@ func tcpServer(cmd *cobra.Command, args []string) {
 
 	// start HTTP server
 	if viper.GetBool("http.enabled") {
-		go h.ListenWS(viper.GetString("http.host"), viper.GetInt("http.port"), wsError)
+		go h.ListenHTTP(viper.GetString("http.host"), viper.GetInt("http.port"), wsError)
 	}
 
 	// start mDNS server
