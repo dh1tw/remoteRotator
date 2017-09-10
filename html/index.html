@@ -12,21 +12,14 @@
 </head>
 
 <body>
-  <div id="app" class="center">
-    <div class="container">
-      <div class="main-rotator">
-          <h3 id="main-rotator-heading">{{selectedRotator}}</h3>
-            <div id="heading-wrap">
-                <canvas id="heading" ref="azimuthHeading" width=200 height=200></canvas>
-            </div>
-        </div>
-        <div id="mini-rotators" class="hidden">
-        </div>
-        <div id="counter">
-          <p>{{total}}</p>
-          <button-counter v-on:increment="incrementTotal"></button-counter>
-          <button-counter v-on:increment="incrementTotal"></button-counter>
-        </div>
+  <div id="app">
+    <!-- <div class="container"> -->
+    <div class="main-rotator">
+      <azimuth-rotator v-on:set-azimuth="setAzimuth" :name="azName" :heading="azHeading" :preset="azPreset" :enabled="azEnabled"
+        :canvas-size="azCanvasSize"></azimuth-rotator>
+    </div>
+    <div id="mini-rotators" class="hidden">
+    </div>
     <div id="connection">
       <p id="connected" class="bg-success" v-bind:class="{'hidden': hideConnectionMsg}" v-if="connected">
         <i class="fa fa-check"></i> Connected to Server
@@ -35,6 +28,7 @@
         <i class="fa fa-spinner fa-spin" aria-hidden="true"></i> Connecting to Server
       </p>
     </div>
+    <!-- </div> -->
   </div>
   <!-- /.container -->
   <script src="/static/js/vue.js"></script>
@@ -43,8 +37,7 @@
   <script src="/static/js/jquery-2.2.3.min.js"></script>
   <script src="/static/js/bootstrap.min.js"></script>
   <script src="/static/js/reconnecting-websocket.js"></script>
-  <script src="/static/js/heading.js"></script>
-  <script src="/static/js/rotators.js"></script>
+  <!-- <script src="/static/js/heading.js"></script> -->
   <script src="/static/js/app.js"></script>
 </body>
 

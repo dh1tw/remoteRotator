@@ -1,137 +1,117 @@
+
 body {
-  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
-  background-color: black;
+    padding-top: 20px;
+    font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+    background-color: black;
 }
 
-.mynavbar {
-    position: fixed;
-    top: 0px;
-    background-color: white;
+#app {
     width: 100%;
-    height: 25px;
-}
-
-.mynavbar ul{
-    padding: 2px 0 2px 0;
-    text-align: center;
-    list-style-type: none;
-}
-
-.mynavbar ul li{
-    padding: 2px 0 2px 0;
-    text-align: center;
-    list-style-type: none;
-    font-size: 14px;
-}
-
-
-a {
-  color: #00B7FF;
-}
-
-.center {
     margin-left: auto;
     margin-right: auto;
-    width: 80%;
+    padding-left: 20px;
 }
 
-.main-rotator{
-    width: 275px;
+.main-rotator {
+    display: inline-block;
+    min-width: 220px;
 }
 
-#main-rotator-heading{
+#azimuth-rotator {
+
+}
+
+
+.main-rotator .name {
     color: white;
     text-align: center;
     padding: 5px;
     border: 3px solid #5cb85c;
-/*    background-color: #5cb85c;*/
     border-radius: 8px;
 }
 
-.mini-rotator-btn.active, #mini-rotator-btn.btn:active{
+.rotator-canvas {
+    width: inherit;
+    margin: auto;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.mini-rotator-btn.active,
+#mini-rotator-btn.btn:active {
     background-color: #5cb85c;
     color: white;
     border-color: #26BBA6;
 }
 
 .hidden {
-/*    display: none;*/
+    /*    display: none;*/
     visibility: hidden;
 }
 
-#heading-wrap{
-    padding-left: 39px;
-}
 
-#mini-rotators{
+#mini-rotators {
     border-top: 5px solid white;
     margin: 5px 0 15px 0;
     padding-top: 15px;
     width: 275px;
 }
 
-.mini-rotator{
+.mini-rotator {
     width: 80px;
     height: 105px;
     float: left;
     margin: 5px 5px 5px 5px;
 }
 
-.mini-rotator-btn{
+.mini-rotator-btn {
     color: white;
     text-align: center;
     margin-bottom: 5px;
     width: 80px;
 }
 
-.mini-rotator-canvas{
+.mini-rotator-canvas {
     text-align: center;
 }
 
-.msg{
+.msg {
     border-radius: 0px;
     margin: 10px 0 0 0;
 }
 
-.messages{
+.messages {
     width: 100%;
     left: 0px;
     position: fixed;
     bottom: 0px;
 }
 
-.modal-input{
+.modal-input {
     width: 100%;
     padding: 5px;
 }
 
-.settings-input{
+.settings-input {
     margin-bottom: 15px;
 }
 
-.mynavbar .settings{
+.mynavbar .settings {
     cursor: pointer;
 }
 
-body {
-    padding-top: 50px;
-  }
-  .starter-template {
-    padding: 40px 15px;
-    text-align: center;
-  }
-  
-  #connection{
-      bottom: 0px;
+
+#connection {
+    bottom: 0px;
     left: 0px;
-      position: fixed;
-      width: 100%;
+    position: fixed;
+    width: 100%;
     height: 40px;
-      /*z-index: 20000000;*/
-  }
-  
-  #connection p{
-      text-align: center;
-      padding-top: 10px;
-      padding-bottom: 10px;
-  }
+    /*z-index: 20000000;*/
+}
+
+#connection p {
+    text-align: center;
+    padding-top: 10px;
+    padding-bottom: 10px;
+}

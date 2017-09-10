@@ -40,21 +40,21 @@ heading_options_small = {
     drawDigits: false
 }
 
-heading_options_large = {
-    scale: 2, 
-    font: "normal 14pt Arial",
-    color: "#FFF",
-    needleColor: "red",
-    needleColorRing: "yellow",
-    lineWidth: 3
-}
+// heading_options_large = {
+//     scale: 2, 
+//     font: "normal 14pt Arial",
+//     color: "#FFF",
+//     needleColor: "red",
+//     needleColorRing: "yellow",
+//     lineWidth: 3
+// }
 
-indicatorOptions = {
-    scale: 2, 
-    font: "normal 14pt Arial",
-    color: "yellow",
-    lineWidth: 3
-}
+// indicatorOptions = {
+//     scale: 2, 
+//     font: "normal 14pt Arial",
+//     color: "yellow",
+//     lineWidth: 3
+// }
 
 // function draw_heading(heading, preSet, drawNeedle) {
 //     //wrapper function to draw heading canvas
