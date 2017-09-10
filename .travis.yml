@@ -22,16 +22,22 @@ matrix:
     - GIMME_ARCH=arm
     - HOST_OS=linux
     go: 1.9  
+  # - os: linux  #temporarily removed since hashicorp/go.net doesn't compile
+  #   env:
+  #   - GIMME_OS=linux
+  #   - GIMME_ARCH=arm64
+  #   - HOST_OS=linux
+  #   go: 1.9  
   - os: linux
     env:
-    - GIMME_OS=linux
-    - GIMME_ARCH=arm64
+    - GIMME_OS=windows
+    - GIMME_ARCH=amd64
     - HOST_OS=linux
     go: 1.9  
   - os: linux
     env:
     - GIMME_OS=windows
-    - GIMME_ARCH=amd64
+    - GIMME_ARCH=i386
     - HOST_OS=linux
     go: 1.9  
   - os: osx

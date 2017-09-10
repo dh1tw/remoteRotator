@@ -33,7 +33,7 @@ remoteRadio is published under the permissive [MIT license](https://github.com/d
 ## Download
 
 You can download a tarball / zip archive with the compiled binary for MacOS
-(AMD64), Linux (386/AMD64/ARM/ARM64) and Windows (386/AMD64) from the
+(AMD64), Linux (386/AMD64/ARM) and Windows (386/AMD64) from the
 [releases](https://github.com/dh1tw/remoteRotator/releases) page. remoteRotator
 is just a single executable.
 
