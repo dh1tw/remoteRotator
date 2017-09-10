@@ -37,7 +37,7 @@ matrix:
   - os: linux
     env:
     - GIMME_OS=windows
-    - GIMME_ARCH=i386
+    - GIMME_ARCH=386
     - HOST_OS=linux
     go: 1.9  
   - os: osx
