@@ -27,6 +27,8 @@ matrix:
     - GIMME_OS=linux
     - GIMME_ARCH=arm64
     - HOST_OS=linux
+    apt: 
+    - gcc-4.8-aarch64-linux-gnu
     go: 1.9  
   - os: linux
     env:
