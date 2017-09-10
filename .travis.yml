@@ -43,8 +43,8 @@ matrix:
 
 before_install:
 - git fetch --tags
-- GOARCH=amd64 GOOS=$HOST_OS go get golang.org/x/tools/cmd/stringer
 - GOARCH=amd64 GOOS=$HOST_OS go get github.com/mattn/goveralls
+- GOARCH=amd64 GOOS=$HOST_OS make install-deps
 script:
 - GOARCH=$GIMME_ARCH GOOS=$GIMME_OS go get ./...
 - GOARCH=$GIMME_ARCH GOOS=$GIMME_OS ./ci/test.sh

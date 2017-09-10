@@ -31,6 +31,8 @@ type Ars struct {
 	elPreset        int
 	hasAzimuth      bool
 	hasElevation    bool
+	azInitialized   bool
+	elInitialized   bool
 	pollingInterval time.Duration
 	pollingTicker   *time.Ticker
 	eventHandler    func(rotator.Rotator, rotator.Event, ...interface{})
@@ -311,20 +313,28 @@ func (r *Ars) setValueAndCallEvent(ev rotator.Event, value int) {
 
 	switch ev {
 	case rotator.Azimuth:
+		if !r.azInitialized {
+			r.azPreset = value
+			r.azInitialized = true
+		}
 		if r.azimuth != value {
 			r.azimuth = value
 			if r.eventHandler != nil {
 				// cb launched async to avoid deadlock
 				// on ars.*()
-				go r.eventHandler(r, rotator.Azimuth, value)
+				go r.eventHandler(r, rotator.Azimuth, r.serialize())
 			}
 		}
 	case rotator.Elevation:
+		if !r.elInitialized {
+			r.elPreset = value
+			r.elInitialized = true
+		}
 		if r.elevation != value {
 			r.elevation = value
 			if r.eventHandler != nil {
 				// cb launched async
-				go r.eventHandler(r, rotator.Elevation, value)
+				go r.eventHandler(r, rotator.Elevation, r.serialize())
 			}
 		}
 	}
@@ -481,11 +491,15 @@ func (r *Ars) StopElevation() error {
 	return nil
 }
 
-// Serialize returns a a rotator.Status struct with the information
+// Status returns a a rotator.Status struct with the information
 // of this rotator.
-func (r *Ars) Serialize() rotator.Status {
+func (r *Ars) Status() rotator.Status {
 	r.Lock()
 	defer r.Unlock()
+	return r.serialize()
+}
+
+func (r *Ars) serialize() rotator.Status {
 	return rotator.Status{
 		Name:      r.name,
 		Azimuth:   r.azimuth,

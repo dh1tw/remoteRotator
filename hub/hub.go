@@ -81,6 +81,8 @@ func (hub *Hub) RemoveTCPClient(c *TCPClient) {
 
 // AddWsClient registers a new tcp client
 func (hub *Hub) AddWsClient(client *WsClient) {
+	hub.Lock()
+	defer hub.Unlock()
 
 	if _, alreadyInMap := hub.wsClients[client]; alreadyInMap {
 		delete(hub.wsClients, client)
@@ -153,7 +155,7 @@ func (hub *Hub) wsHandler(w http.ResponseWriter, r *http.Request) {
 		Conn: conn,
 	}
 
-	s := hub.rotator.Serialize()
+	s := hub.rotator.Status()
 	c.write(s)
 
 	hub.AddWsClient(c)

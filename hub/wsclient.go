@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/dh1tw/remoteRotator/rotator"
 	"github.com/gorilla/websocket"
@@ -23,6 +24,9 @@ func (c *WsClient) listen(r rotator.Rotator, closer chan<- *WsClient) {
 
 		messageType, p, err := c.ReadMessage()
 		if err != nil {
+			if strings.Contains(err.Error(), "(going away)") {
+				return
+			}
 			log.Printf("websocket read error (%v): %v\n", c.Conn.RemoteAddr(), err)
 			return
 		}

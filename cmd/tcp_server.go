@@ -34,8 +34,8 @@ func init() {
 	tcpServerCmd.Flags().StringP("tcp-host", "u", "127.0.0.1", "Host (use '0.0.0.0' to listen on all network adapters)")
 	tcpServerCmd.Flags().IntP("tcp-port", "p", 7373, "TCP Port")
 	tcpServerCmd.Flags().BoolP("http-enabled", "", true, "enable HTTP Server")
-	tcpServerCmd.Flags().StringP("http-host", "", "127.0.0.1", "Host (use '0.0.0.0' to listen on all network adapters)")
-	tcpServerCmd.Flags().IntP("http-port", "", 7070, "Port for the HTTP access to the rotator")
+	tcpServerCmd.Flags().StringP("http-host", "w", "127.0.0.1", "Host (use '0.0.0.0' to listen on all network adapters)")
+	tcpServerCmd.Flags().IntP("http-port", "k", 7070, "Port for the HTTP access to the rotator")
 	tcpServerCmd.Flags().BoolP("discovery-enabled", "", true, "make rotator discoverable on the network")
 	tcpServerCmd.Flags().StringP("portname", "P", "/dev/ttyACM0", "portname / path to the rotator (e.g. COM1)")
 	tcpServerCmd.Flags().IntP("baudrate", "b", 9600, "baudrate")
@@ -101,10 +101,16 @@ func tcpServer(cmd *cobra.Command, args []string) {
 	bcast := make(chan rotator.Status, 10)
 
 	var arsEventHandler = func(r rotator.Rotator, ev rotator.Event, value ...interface{}) {
-		fmt.Println(ev, value)
+		// fmt.Println(ev, value)
 		switch ev {
 		case rotator.Azimuth, rotator.Elevation:
-			bcast <- r.Serialize()
+			if len(value) == 0 {
+				return
+			}
+			switch value[0].(type) {
+			case rotator.Status:
+				bcast <- value[0].(rotator.Status)
+			}
 		default:
 			log.Printf("unknown event: %v with value(s): %v\n", ev, value)
 		}
@@ -153,6 +159,8 @@ func tcpServer(cmd *cobra.Command, args []string) {
 		go h.ListenHTTP(viper.GetString("http.host"), viper.GetInt("http.port"), wsError)
 	}
 
+	// shutdownWg := sync.WaitGroup{}
+	mDNSServer := &mdns.Server{}
 	// start mDNS server
 	if viper.GetBool("discovery.enabled") {
 
@@ -181,7 +189,7 @@ func tcpServer(cmd *cobra.Command, args []string) {
 			fmt.Printf("unable to start mDNS discovery service: %v", err)
 			return
 		}
-		mDNSServer, _ := mdns.NewServer(&mdns.Config{Zone: mDNSService})
+		mDNSServer, _ = mdns.NewServer(&mdns.Config{Zone: mDNSService})
 		defer mDNSServer.Shutdown()
 	}
 
@@ -190,7 +198,6 @@ func tcpServer(cmd *cobra.Command, args []string) {
 		case sig := <-osSignals:
 			if sig == os.Interrupt {
 				close(arsShutdown)
-				return
 			}
 		case msg := <-bcast:
 			h.Broadcast(msg)

@@ -7,8 +7,8 @@ type Event int
 
 // Events send from a rotator
 const (
-	Azimuth   Event = iota // int
-	Elevation              // int
+	Azimuth   Event = iota // sending as value Status{}
+	Elevation              // sending as value Status{}
 )
 
 // Rotator is the interface which has to be implemented by each Rotator
@@ -25,7 +25,7 @@ type Rotator interface {
 	StopAzimuth() error
 	StopElevation() error
 	Stop() error
-	Serialize() Status
+	Status() Status
 	ExecuteRequest(Request) error
 	Info() Info
 }
