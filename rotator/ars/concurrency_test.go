@@ -126,7 +126,7 @@ func randomAccess(r *Ars, timeout time.Duration, c *apiCallCounter,
 
 		switch randFunc {
 		case 0:
-			r.Serialize()
+			r.Status()
 			atomic.AddUint64(&c.serialize, 1)
 		case 1:
 			r.Azimuth()

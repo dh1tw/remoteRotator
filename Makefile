@@ -18,6 +18,8 @@ build:
 
 generate:
 	go generate ./...
+	cd hub; \
+	rice embed-go 
 
 dist: 
 	go build -v -ldflags="-w -X github.com/dh1tw/remoteRotator/cmd.commitHash=${COMMIT} \
@@ -44,6 +46,8 @@ install:
 		-X github.com/dh1tw/remoteRotator/cmd.version=${VERSION}"
 
 install-deps:
+	go get golang.org/x/tools/cmd/stringer
+	go get github.com/GeertJohan/go.rice/rice
 	go get ./...
 
 windows:

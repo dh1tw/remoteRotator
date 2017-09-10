@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>RemoteRotator WebUI</title>
+  <link rel="stylesheet" href="/static/css/font-awesome.min.css">
+  <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+  <div id="app">
+    <div class="main-rotator">
+      <azimuth-rotator v-on:set-azimuth="setAzimuth" :name="azName" :heading="azHeading" :preset="azPreset" :enabled="azEnabled"
+        :canvas-size="azCanvasSize"></azimuth-rotator>
+    </div>
+    <div id="mini-rotators" class="hidden">
+    </div>
+    <div id="connection">
+      <p id="connected" class="bg-success" v-bind:class="{'hidden': hideConnectionMsg}" v-if="connected">
+        <i class="fa fa-check"></i> Connected to Server
+      </p>
+      <p id="no-connection" class="bg-danger" v-else="connected">
+        <i class="fa fa-spinner fa-spin" aria-hidden="true"></i> Connecting to Server
+      </p>
+    </div>
+  </div>
+  <script src="/static/js/vue.js"></script>
+  <script src="/static/js/vue-resource-1.3.4.min.js"></script>
+  <script src="/static/js/components/azimuth-rotator.js"></script>
+  <script src="/static/js/jquery-2.2.3.min.js"></script>
+  <script src="/static/js/bootstrap.min.js"></script>
+  <script src="/static/js/reconnecting-websocket.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+
+</html>

@@ -19,12 +19,20 @@ import (
 type Ars struct {
 	sync.Mutex
 	name            string
+	description     string
+	azimuthMin      int
+	azimuthMax      int
+	azimuthStop     int
+	elevationMin    int
+	elevationMax    int
 	azimuth         int
 	azPreset        int
 	elevation       int
 	elPreset        int
 	hasAzimuth      bool
 	hasElevation    bool
+	azInitialized   bool
+	elInitialized   bool
 	pollingInterval time.Duration
 	pollingTicker   *time.Ticker
 	eventHandler    func(rotator.Rotator, rotator.Event, ...interface{})
@@ -88,6 +96,41 @@ func Portname(pn string) func(*Ars) {
 	}
 }
 
+// AzimuthMin is a functional option to set the minimum azimuth angle.
+func AzimuthMin(min int) func(*Ars) {
+	return func(r *Ars) {
+		r.azimuthMin = min
+	}
+}
+
+// AzimuthMax is a functional option to set the maximum azimuth angle.
+func AzimuthMax(max int) func(*Ars) {
+	return func(r *Ars) {
+		r.azimuthMax = max
+	}
+}
+
+// AzimuthStop is a functional option to set the mechanical stop of the rotator.
+func AzimuthStop(stop int) func(*Ars) {
+	return func(r *Ars) {
+		r.azimuthStop = stop
+	}
+}
+
+// ElevationMin is a functional option to set the minimum elevation angle.
+func ElevationMin(min int) func(*Ars) {
+	return func(r *Ars) {
+		r.elevationMin = min
+	}
+}
+
+// ElevationMax is a functional option to set the maximum elevation angle.
+func ElevationMax(max int) func(*Ars) {
+	return func(r *Ars) {
+		r.elevationMax = max
+	}
+}
+
 // NewArs creates a new Ars object which satisfies the rotator.Rotator interface.
 // Configuration settings are set through functional options. The the Ars
 // can not be initialized nil and the corresponding error will be returned.
@@ -110,6 +153,8 @@ func NewArs(opts ...func(*Ars)) (*Ars, error) {
 		spPortName:      "/dev/ttyACM0",
 		spBaudrate:      9600,
 		headingPattern:  headingPattern,
+		azimuthMax:      450,
+		elevationMax:    180,
 	}
 
 	for _, opt := range opts {
@@ -268,20 +313,28 @@ func (r *Ars) setValueAndCallEvent(ev rotator.Event, value int) {
 
 	switch ev {
 	case rotator.Azimuth:
+		if !r.azInitialized {
+			r.azPreset = value
+			r.azInitialized = true
+		}
 		if r.azimuth != value {
 			r.azimuth = value
 			if r.eventHandler != nil {
 				// cb launched async to avoid deadlock
 				// on ars.*()
-				go r.eventHandler(r, rotator.Azimuth, value)
+				go r.eventHandler(r, rotator.Azimuth, r.serialize())
 			}
 		}
 	case rotator.Elevation:
+		if !r.elInitialized {
+			r.elPreset = value
+			r.elInitialized = true
+		}
 		if r.elevation != value {
 			r.elevation = value
 			if r.eventHandler != nil {
 				// cb launched async
-				go r.eventHandler(r, rotator.Elevation, value)
+				go r.eventHandler(r, rotator.Elevation, r.serialize())
 			}
 		}
 	}
@@ -438,18 +491,67 @@ func (r *Ars) StopElevation() error {
 	return nil
 }
 
-// Serialize returns a a rotator.Status struct with the information
+// Status returns a a rotator.Status struct with the information
 // of this rotator.
-func (r *Ars) Serialize() rotator.Status {
+func (r *Ars) Status() rotator.Status {
 	r.Lock()
 	defer r.Unlock()
+	return r.serialize()
+}
+
+func (r *Ars) serialize() rotator.Status {
 	return rotator.Status{
-		Name:         r.name,
-		HasElevation: r.hasElevation,
-		HasAzimuth:   r.hasAzimuth,
-		Azimuth:      r.azimuth,
-		AzPreset:     r.azPreset,
-		Elevation:    r.elevation,
-		ElPreset:     r.elPreset,
+		Name:      r.name,
+		Azimuth:   r.azimuth,
+		AzPreset:  r.azPreset,
+		Elevation: r.elevation,
+		ElPreset:  r.elPreset,
 	}
+}
+
+// ExecuteRequest takes a request struct and sets the new values
+func (r *Ars) ExecuteRequest(req rotator.Request) error {
+	if req.HasAzimuth {
+		if err := r.SetAzimuth(req.Azimuth); err != nil {
+			return err
+		}
+	}
+
+	if req.HasElevation {
+		if err := r.SetElevation(req.Elevation); err != nil {
+			return err
+		}
+	}
+
+	if req.StopAzimuth {
+		if err := r.StopAzimuth(); err != nil {
+			return err
+		}
+	}
+
+	if req.StopElevation {
+		if err := r.StopElevation(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *Ars) Info() rotator.Info {
+	r.Lock()
+	defer r.Unlock()
+
+	info := rotator.Info{
+		Name:         r.name,
+		Description:  r.description,
+		HasAzimuth:   r.hasAzimuth,
+		HasElevation: r.hasElevation,
+		AzimuthMin:   r.azimuthMin,
+		AzimuthMax:   r.azimuthMax,
+		AzimuthStop:  r.azimuthStop,
+		ElevationMin: r.elevationMin,
+		ElevationMax: r.elevationMax,
+	}
+	return info
 }

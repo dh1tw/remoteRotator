@@ -8,11 +8,13 @@ import (
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/dh1tw/remoteRotator/rotator"
 )
 
 //TCPClient is a wrapper for clients connected through plain a TCP socket.
 type TCPClient struct {
-	Conn net.Conn
+	net.Conn
 }
 
 // listen starts listening for incoming messages from tcp connections. This
@@ -20,8 +22,10 @@ type TCPClient struct {
 // a error occurs, the routine returns and deletes the tcp connection.
 // Since this method contains an endless loop it should be executed
 // in a go routine.
-func (c *TCPClient) listen(hub *Hub) {
-	defer hub.RemoveTCPClient(c)
+func (c *TCPClient) listen(rotator rotator.Rotator, closer chan<- *TCPClient) {
+	defer func() {
+		closer <- c
+	}()
 
 	for {
 		msg, err := bufio.NewReader(c.Conn).ReadString('\n')
@@ -50,20 +54,20 @@ func (c *TCPClient) listen(hub *Hub) {
 				log.Printf("parse error (%v): %v; msg: %s\n", c.Conn.RemoteAddr(), err, msg)
 				continue
 			}
-			hub.rotator.SetAzimuth(az)
+			rotator.SetAzimuth(az)
 		// query
 		case "C":
 			// azimuth + elevation
 			if msg[1] == '2' {
-				az := hub.rotator.Azimuth()
-				el := hub.rotator.Elevation()
+				az := rotator.Azimuth()
+				el := rotator.Elevation()
 				if err := c.write(fmt.Sprintf("+0%.3d+0%.3d\r\n", az, el)); err != nil {
 					log.Println(err)
 					return
 				}
 				// only azimuth
 			} else {
-				az := hub.rotator.Azimuth()
+				az := rotator.Azimuth()
 				if err := c.write(fmt.Sprintf("+0%.3d\r\n", az)); err != nil {
 					log.Println(err)
 					return
@@ -71,19 +75,19 @@ func (c *TCPClient) listen(hub *Hub) {
 			}
 		// stop azimuth
 		case "A":
-			if err := hub.rotator.StopAzimuth(); err != nil {
+			if err := rotator.StopAzimuth(); err != nil {
 				log.Println(err)
 				return
 			}
 		// stop elevation
 		case "E":
-			if err := hub.rotator.StopElevation(); err != nil {
+			if err := rotator.StopElevation(); err != nil {
 				log.Println(err)
 				return
 			}
 		// stop all
 		case "S":
-			if err := hub.rotator.Stop(); err != nil {
+			if err := rotator.Stop(); err != nil {
 				log.Println(err)
 				return
 			}
