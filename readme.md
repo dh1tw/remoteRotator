@@ -20,15 +20,18 @@ has been reached.
 
 ## Supported Rotators
 
-- [EA4TX's ARS](http://ea4tx.com/en/)
+- [Yaesu GS232A](http://www.yaesu.com/indexVS.cfm?cmd=DisplayProducts&ProdCatID=104&encProdID=79A89CEC477AA3B819EE02831F3FD5B8)
+- [EA4TX ARS](http://ea4tx.com/en/)
 
 ## Supported Transportation Protocols
 
 - TCP
+- HTTP
+- Websockets
 
 ## License
 
-remoteRadio is published under the permissive [MIT license](https://github.com/dh1tw/remoteRotator/blob/master/LICENSE).
+remoteRotator is published under the permissive [MIT license](https://github.com/dh1tw/remoteRotator/blob/master/LICENSE).
 
 ## Download
 
@@ -61,15 +64,26 @@ Usage:
   remoteRotator server tcp [flags]
 
 Flags:
+      --azimuth-max int        metadata: maximum azimuth (in deg) (default 450)
+      --azimuth-min int        metadata: minimum azimuth (in deg)
+      --azimuth-stop int       metadata: mechanical azimuth stop (in deg)
   -b, --baudrate int           baudrate (default 9600)
+  -d, --description string     Description (default "Yaesu G1000 with 4el 20m Yagi@18m ASL")
+      --discovery-enabled      make rotator discoverable on the network (default true)
+      --elevation-max int      metadata: maximum elevation (in deg) (default 180)
+      --elevation-min int      metadata: minimum elevation (in deg)
       --has-azimuth            Indicate if the rotator supports Azimuth (default true)
       --has-elevation          Indicate if the rotator supports Elevation
   -h, --help                   help for tcp
-  -u, --host string            Host (use '0.0.0.0' for public access) (default "127.0.0.1")
+      --http-enabled           enable HTTP Server (default true)
+  -w, --http-host string       Host (use '0.0.0.0' to listen on all network adapters) (default "127.0.0.1")
+  -k, --http-port int          Port for the HTTP access to the rotator (default 7070)
   -n, --name string            Name tag for the rotator (default "myRotator")
       --pollingrate duration   rotator polling rate (default 1s)
-  -p, --port int               TCP Port (default 7373)
   -P, --portname string        portname / path to the rotator (e.g. COM1) (default "/dev/ttyACM0")
+      --tcp-enabled            enable TCP Server (default true)
+  -u, --tcp-host string        Host (use '0.0.0.0' to listen on all network adapters) (default "127.0.0.1")
+  -p, --tcp-port int           TCP Port (default 7373)
   -t, --type string            Rotator type (supported: ARS (default "ARS")
 
 Global Flags:
@@ -86,7 +100,26 @@ $ remoteRotator server tcp -u "0.0.0.0" -p 5050 -P "COM3"
 ```
 no config file found
 Listening on 0.0.0.0:5050 for TCP connections
+Listening on 0.0.0.0:7070 for HTTP connections
+
 ```
+
+## Web Interface
+
+
+![Alt text](https://i.imgur.com/X8zJwQO.png "remoteRotator WebUI")
+
+Appart of connecting to the rotator through a TCP socket, you can also
+access the rotator through a web Interface. You can specify the host and port
+in the settings above, or deactivate the built-in webserver if you don't need it.
+
+The red arrow indicates the heading of the rotator and the yellow arrow
+indicates the preset value to which the rotator will turn to.
+
+If you would like to access remoteRotator via Websockets, then go to the
+url `http://<http-host>:<http-port>/ws`.
+
+**Note:** Currently only horizontal (azimuth) rotators are supported.
 
 ## Config file
 
@@ -145,12 +178,13 @@ The auto generated documentation can be found at
 In order to compile remoteRotator from the sources, you need to have
 [Go](https://golang.org) installed and configured.
 
+This his how to checkout and compile remoteRotator under Linux/MacOS:
+
 ```bash
 $ go get -d github.com/dh1tw/remoteRotator
 $ cd $GOPATH/src/github.com/remoteRotator
-$ go get ./...
-$ go make generate
-$ go make
+$ make install-deps
+$ make generate
 ```
 
 ## How to execute the tests
