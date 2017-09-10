@@ -183,7 +183,7 @@ func tcpServer(cmd *cobra.Command, args []string) {
 		}
 
 		mDNSService, err := mdns.NewMDNSService(viper.GetString("rotator.name"),
-			"rotators.shackbus", "", "", 7375, nil, []string{info})
+			"rotators.shackbus", "", "", viper.GetInt("http.port"), nil, []string{info})
 
 		if err != nil {
 			fmt.Printf("unable to start mDNS discovery service: %v", err)
