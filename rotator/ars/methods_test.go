@@ -301,9 +301,15 @@ func TestParseMsg(t *testing.T) {
 		if ev != rotator.Azimuth && ev != rotator.Elevation {
 			t.Fatalf("expected event 'Azimuth' or 'Elevation', got: %v", ev)
 		}
-		if v[0].(int) <= 0 {
-			t.Fatalf("expected value must be > 0, got %v", v[0])
+		az := v[0].(rotator.Status).Azimuth
+		el := v[0].(rotator.Status).Elevation
+		if az <= 0 {
+			t.Fatalf("expected value must be > 0, got %v", az)
 		}
+		if el < 0 {
+			t.Fatalf("expected value must be > 0, got %v", el)
+		}
+
 	}
 
 	tt := []struct {
@@ -337,7 +343,7 @@ func TestSetValueAndCallEvent(t *testing.T) {
 		if ev != rotator.Azimuth {
 			t.Fatalf("expected event 'Azimuth', got: %v", ev)
 		}
-		if v[0].(int) != 30 {
+		if v[0].(rotator.Status).Azimuth != 30 {
 			t.Fatalf("expected value must be 30, got %v", v[0])
 		}
 	}
@@ -346,7 +352,7 @@ func TestSetValueAndCallEvent(t *testing.T) {
 		if ev != rotator.Elevation {
 			t.Fatalf("expected event 'Elevation', got: %v", ev)
 		}
-		if v[0].(int) != 60 {
+		if v[0].(rotator.Status).Elevation != 60 {
 			t.Fatalf("expected value must be 30, got %v", v[0])
 		}
 	}
