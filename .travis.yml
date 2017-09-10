@@ -27,8 +27,6 @@ matrix:
     - GIMME_OS=linux
     - GIMME_ARCH=arm64
     - HOST_OS=linux
-    apt: 
-    - gcc-4.8-aarch64-linux-gnu
     go: 1.9  
   - os: linux
     env:
@@ -46,9 +44,8 @@ matrix:
 before_install:
 - git fetch --tags
 - GOARCH=amd64 GOOS=$HOST_OS go get github.com/mattn/goveralls
-- GOARCH=amd64 GOOS=$HOST_OS make install-deps
+- GOARCH=$GIMME_ARCH GOOS=$GIMME_OS make install-deps
 script:
-- GOARCH=$GIMME_ARCH GOOS=$GIMME_OS go get ./...
 - GOARCH=$GIMME_ARCH GOOS=$GIMME_OS ./ci/test.sh
 - GOARCH=amd64 GOOS=$HOST_OS make generate
 - GOARCH=$GIMME_ARCH GOOS=$GIMME_OS make dist
