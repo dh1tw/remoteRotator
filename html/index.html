@@ -13,7 +13,6 @@
 
 <body>
   <div id="app">
-    <!-- <div class="container"> -->
     <div class="main-rotator">
       <azimuth-rotator v-on:set-azimuth="setAzimuth" :name="azName" :heading="azHeading" :preset="azPreset" :enabled="azEnabled"
         :canvas-size="azCanvasSize"></azimuth-rotator>
@@ -28,16 +27,13 @@
         <i class="fa fa-spinner fa-spin" aria-hidden="true"></i> Connecting to Server
       </p>
     </div>
-    <!-- </div> -->
   </div>
-  <!-- /.container -->
   <script src="/static/js/vue.js"></script>
   <script src="/static/js/vue-resource-1.3.4.min.js"></script>
   <script src="/static/js/components/azimuth-rotator.js"></script>
   <script src="/static/js/jquery-2.2.3.min.js"></script>
   <script src="/static/js/bootstrap.min.js"></script>
   <script src="/static/js/reconnecting-websocket.js"></script>
-  <!-- <script src="/static/js/heading.js"></script> -->
   <script src="/static/js/app.js"></script>
 </body>
 
