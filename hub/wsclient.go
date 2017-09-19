@@ -24,7 +24,8 @@ func (c *WsClient) listen(r rotator.Rotator, closer chan<- *WsClient) {
 
 		messageType, p, err := c.ReadMessage()
 		if err != nil {
-			if strings.Contains(err.Error(), "(going away)") {
+			if strings.Contains(err.Error(), "(going away)") ||
+				strings.Contains(err.Error(), "(abnormal closure)") {
 				return
 			}
 			log.Printf("websocket read error (%v): %v\n", c.Conn.RemoteAddr(), err)

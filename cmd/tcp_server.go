@@ -17,6 +17,7 @@ import (
 	"github.com/dh1tw/remoteRotator/hub"
 	"github.com/dh1tw/remoteRotator/rotator"
 	"github.com/dh1tw/remoteRotator/rotator/ars"
+	"github.com/dh1tw/remoteRotator/rotator/dummy"
 	// _ "net/http/pprof"
 )
 
@@ -116,34 +117,49 @@ func tcpServer(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	evHandler := ars.EventHandler(arsEventHandler)
-	name := ars.Name(viper.GetString("rotator.name"))
-	interval := ars.UpdateInterval(viper.GetDuration("rotator.pollingrate"))
-	spPortName := ars.Portname(viper.GetString("rotator.portname"))
-	baudrate := ars.Baudrate(viper.GetInt("rotator.baudrate"))
-	hasAzimuth := ars.HasAzimuth(viper.GetBool("rotator.has-azimuth"))
-	hasElevation := ars.HasElevation(viper.GetBool("rotator.has-elevation"))
+	h := &hub.Hub{}
 
-	ars, err := ars.NewArs(name, interval, evHandler,
-		spPortName, baudrate, hasAzimuth, hasElevation)
-	if err != nil {
-		fmt.Println("unable to initialize ARS:", err)
+	rotatorError := make(chan struct{})
+	rotatorShutdown := make(chan struct{})
+
+	switch strings.ToUpper(viper.GetString("rotator.type")) {
+
+	case "ARS":
+		evHandler := ars.EventHandler(arsEventHandler)
+		name := ars.Name(viper.GetString("rotator.name"))
+		interval := ars.UpdateInterval(viper.GetDuration("rotator.pollingrate"))
+		spPortName := ars.Portname(viper.GetString("rotator.portname"))
+		baudrate := ars.Baudrate(viper.GetInt("rotator.baudrate"))
+		hasAzimuth := ars.HasAzimuth(viper.GetBool("rotator.has-azimuth"))
+		hasElevation := ars.HasElevation(viper.GetBool("rotator.has-elevation"))
+
+		ars, err := ars.NewArs(name, interval, evHandler,
+			spPortName, baudrate, hasAzimuth, hasElevation)
+		if err != nil {
+			fmt.Println("unable to initialize ARS:", err)
+			os.Exit(1)
+		}
+		h = hub.NewHub(ars)
+		ars.Start(rotatorError, rotatorShutdown)
+
+	case "DUMMY":
+		evHandler := dummy.EventHandler(arsEventHandler)
+		name := dummy.Name(viper.GetString("rotator.name"))
+		hasAzimuth := dummy.HasAzimuth(viper.GetBool("rotator.has-azimuth"))
+		hasElevation := dummy.HasElevation(viper.GetBool("rotator.has-elevation"))
+
+		dummyRotator, err := dummy.NewDummyRotator(name, evHandler, hasAzimuth, hasElevation)
+		if err != nil {
+			fmt.Println("unable to initialize Dummy rotator:", err)
+			os.Exit(1)
+		}
+		h = hub.NewHub(dummyRotator)
+		dummyRotator.Start(rotatorShutdown)
+
+	default:
+		fmt.Printf("unknown rotator type %v\n", viper.GetString("rotator.type"))
 		os.Exit(1)
 	}
-
-	defer ars.Close()
-
-	h := hub.NewHub(ars)
-
-	// Channel to handle OS signals
-	osSignals := make(chan os.Signal, 1)
-
-	//subscribe to os.Interrupt (CTRL-C signal)
-	signal.Notify(osSignals, os.Interrupt)
-
-	arsError := make(chan bool)
-	arsShutdown := make(chan bool)
-	go ars.Start(arsError, arsShutdown)
 
 	tcpError := make(chan bool)
 
@@ -175,7 +191,6 @@ func tcpServer(cmd *cobra.Command, args []string) {
 			ElevationMin: viper.GetInt("rotator.elevation-min"),
 			ElevationMax: viper.GetInt("rotator.elevation-max"),
 		}
-
 		info, err := encodeInfo(i)
 		if err != nil {
 			fmt.Printf("unable to marshal rotator description: %s\n", err)
@@ -193,15 +208,22 @@ func tcpServer(cmd *cobra.Command, args []string) {
 		defer mDNSServer.Shutdown()
 	}
 
+	// Channel to handle OS signals
+	osSignals := make(chan os.Signal, 1)
+
+	//subscribe to os.Interrupt (CTRL-C signal)
+	signal.Notify(osSignals, os.Interrupt)
+
 	for {
 		select {
 		case sig := <-osSignals:
 			if sig == os.Interrupt {
-				close(arsShutdown)
+				close(rotatorShutdown)
+				return
 			}
 		case msg := <-bcast:
 			h.Broadcast(msg)
-		case <-arsError:
+		case <-rotatorError:
 			return
 		case <-tcpError:
 			return

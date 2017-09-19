@@ -39,6 +39,7 @@ type Ars struct {
 	sp              io.ReadWriteCloser
 	spPortName      string
 	spBaudrate      int
+	starter         sync.Once
 	spCloser        sync.Once
 	headingPattern  *regexp.Regexp
 	watchdogTs      time.Time
@@ -180,9 +181,7 @@ func NewArs(opts ...func(*Ars)) (*Ars, error) {
 	return r, nil
 }
 
-// Close terminates the serial port connection. Afterwards the
-// object should be destroyed.
-func (r *Ars) Close() {
+func (r *Ars) close() {
 	r.Lock()
 	defer r.Unlock()
 	if r.pollingTicker != nil {
@@ -214,14 +213,18 @@ func (r *Ars) checkWatchdog() bool {
 // Start starts the main event loop for the serial port.
 // It will query the ARS for the current heading (azimuth + elevation)
 // with the pollingrate defined during initialization.
-// A watchdog detects if the ARS does not respond anymore. Since this
-// function runs in an endless loop, it is typically executed in a
-// go routine.
+// A watchdog detects if the ARS does not respond anymore.
 // If an error occures, the communication will be shut down and the
-// arsEerror channel will be closed.
-func (r *Ars) Start(arsError chan<- bool, shutdown <-chan bool) {
+// arsError channel will be closed.
+func (r *Ars) Start(arsError chan<- struct{}, shutdown <-chan struct{}) {
+	r.starter.Do(func() {
+		go r.start(arsError, shutdown)
+	})
+}
+
+func (r *Ars) start(arsError chan<- struct{}, shutdown <-chan struct{}) {
 	defer close(arsError)
-	defer r.Close()
+	defer r.close()
 
 	r.Lock()
 	r.pollingTicker = time.NewTicker(r.pollingInterval)
@@ -535,9 +538,16 @@ func (r *Ars) ExecuteRequest(req rotator.Request) error {
 		}
 	}
 
+	if req.Stop {
+		if err := r.Stop(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
+// Info returns a rotator.Info struct with the current values of the rotator
 func (r *Ars) Info() rotator.Info {
 	r.Lock()
 	defer r.Unlock()

@@ -76,8 +76,8 @@ func TestArsMassiveConcurrentCalls(t *testing.T) {
 	d := time.Second * 5
 	wg := &sync.WaitGroup{}
 
-	arsError := make(chan bool)
-	shutdown := make(chan bool)
+	arsError := make(chan struct{})
+	shutdown := make(chan struct{})
 
 	calls := &apiCallCounter{}
 
@@ -93,7 +93,7 @@ func TestArsMassiveConcurrentCalls(t *testing.T) {
 	default:
 	}
 	wg.Wait()
-	shutdown <- true
+	close(shutdown)
 	time.Sleep(time.Second * 3)
 	fmt.Println("Concurrent stress test summary:")
 	fmt.Println(strings.Repeat("=", 30))
