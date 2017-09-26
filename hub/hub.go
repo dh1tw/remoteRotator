@@ -162,7 +162,7 @@ func (hub *Hub) wsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (hub *Hub) infoHandler(w http.ResponseWriter, r *http.Request) {
-	i := []rotator.Info{hub.rotator.Info()}
+	i := hub.rotator.Info()
 
 	data, err := json.Marshal(i)
 	if err != nil {

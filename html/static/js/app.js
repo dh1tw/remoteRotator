@@ -29,13 +29,15 @@ var vm = new Vue({
         // of all available rotators
         getRotators: function () {
             this.$http.get("/info").then(rotators => {
-                rotatorsInfoMsg = JSON.parse(rotators.bodyText);
-                for (i = 0; i < rotatorsInfoMsg.length; i++) {
-                    // only if a rotator is not registered, add it
-                    if (!(rotatorsInfoMsg[i].name in this.rotators)) {
-                        this.addRotator(rotatorsInfoMsg[i]);
+                rotatorInfo = JSON.parse(rotators.bodyText);
+                if (Object.prototype.toString.call(rotatorInfo) === '[object Array]') {
+                    for (i = 0; i < rotatorInfo.length; i++) {
+                        this.addRotator(rotatorInfo[i]);
                     }
+                } else {
+                    this.addRotator(rotatorInfo);
                 }
+
                 // TBD check if a rotator has disappeared
 
                 if (this.ws == null) {
@@ -113,11 +115,11 @@ var vm = new Vue({
             var data = JSON.stringify(msg);
             this.ws.send(data);
         },
-        getWindowSize: function(){
+        getWindowSize: function () {
             clearTimeout(this.resizeTimeout);
             this.resizeTimeout = setTimeout(this.resizeWindow, 400);
         },
-        resizeWindow:  function (event) {
+        resizeWindow: function (event) {
 
             var width = document.documentElement.clientWidth;
             var height = document.documentElement.clientHeight;
