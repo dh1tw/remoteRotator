@@ -35,7 +35,7 @@ func discoverMDNS(cmd *cobra.Command, args []string) {
 
 var tmpl = template.Must(template.New("").Parse(
 	`
-Found {{. | len}} rotator(s) on this network:
+Found {{. | len}} rotator(s) on this network
 
 {{range .}}Rotator:
    Name:         {{.Name}}

@@ -69,7 +69,7 @@ func tcpServer(cmd *cobra.Command, args []string) {
 	}
 
 	// check if values from config file / pflags are valid
-	// if !checkAudioParameterValues() {
+	// if !checkParameterValues() {
 	// 	os.Exit(-1)
 	// }
 
@@ -139,7 +139,11 @@ func tcpServer(cmd *cobra.Command, args []string) {
 			fmt.Println("unable to initialize ARS:", err)
 			os.Exit(1)
 		}
-		h = hub.NewHub(ars)
+		h, err = hub.NewHub(ars)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 		ars.Start(rotatorError, rotatorShutdown)
 
 	case "DUMMY":
@@ -153,7 +157,12 @@ func tcpServer(cmd *cobra.Command, args []string) {
 			fmt.Println("unable to initialize Dummy rotator:", err)
 			os.Exit(1)
 		}
-		h = hub.NewHub(dummyRotator)
+		h, err = hub.NewHub(dummyRotator)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
 		dummyRotator.Start(rotatorShutdown)
 
 	default:

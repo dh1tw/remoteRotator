@@ -10,7 +10,7 @@ import (
 // Dummy is the implementation of a Dummy rotator which can be used
 // for testing purposes
 type Dummy struct {
-	sync.Mutex
+	sync.RWMutex
 	eventHandler   func(rotator.Rotator, rotator.Event, ...interface{})
 	name           string
 	description    string
@@ -131,39 +131,39 @@ func (r *Dummy) start(shutdown <-chan struct{}) {
 
 // Name returns the name of the rotator
 func (r *Dummy) Name() string {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	return r.name
 }
 
 // HasAzimuth returns a boolean value indicating if this rotator supports
 // horizontal rotation
 func (r *Dummy) HasAzimuth() bool {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	return r.hasAzimuth
 }
 
 // HasElevation returns a boolean value indicating if this rotator supports
 // vertical rotation
 func (r *Dummy) HasElevation() bool {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	return r.hasElevation
 }
 
 // Azimuth returns the current horizontal heading of the rotator in degrees
 func (r *Dummy) Azimuth() int {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	return int(r.azimuth)
 }
 
 // AzPreset returns the horizontal heading (preset) to which the rotator
 // shall turn to
 func (r *Dummy) AzPreset() int {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	return int(r.azPreset)
 }
 
@@ -180,16 +180,16 @@ func (r *Dummy) SetAzimuth(az int) error {
 
 // Elevation returns the current vertical elevation of the rotator in degrees
 func (r *Dummy) Elevation() int {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	return int(r.elevation)
 }
 
 // ElPreset returns the vertical elevation (preset) to which the rotator
 // shall turn to
 func (r *Dummy) ElPreset() int {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	return int(r.elPreset)
 }
 
@@ -247,8 +247,8 @@ func (r *Dummy) status() rotator.Status {
 // Status returns a a rotator.Status struct with the information
 // of this rotator.
 func (r *Dummy) Status() rotator.Status {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	return r.status()
 }
 
@@ -289,8 +289,8 @@ func (r *Dummy) ExecuteRequest(req rotator.Request) error {
 
 // Info returns a rotator.Info struct with the current values of the rotator
 func (r *Dummy) Info() rotator.Info {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 
 	return rotator.Info{
 		Name:         r.name,
@@ -302,6 +302,10 @@ func (r *Dummy) Info() rotator.Info {
 		AzimuthStop:  r.azimuthStop,
 		ElevationMin: r.elevationMin,
 		ElevationMax: r.elevationMax,
+		Azimuth:      int(r.azimuth),
+		AzPreset:     int(r.azPreset),
+		Elevation:    int(r.elevation),
+		ElPreset:     int(r.elPreset),
 	}
 }
 

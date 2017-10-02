@@ -40,18 +40,20 @@ type Status struct {
 	ElPreset  int    `json:"el_preset"`
 }
 
-// Request contains the fields to control a rotator.
+// Request contains the fields to control a rotator. This message is
+// typically sent from a client (e.g. via a websocket) to the rotator.
 type Request struct {
-	HasAzimuth    bool `json:"has_azimuth,omitempty"`
-	HasElevation  bool `json:"has_elevation,omitempty"`
-	Azimuth       int  `json:"azimuth,omitempty"`
-	Elevation     int  `json:"elevation,omitempty"`
-	StopAzimuth   bool `json:"stop_azimuth,omitempty"`
-	StopElevation bool `json:"stop_elevation,omitempty"`
-	Stop          bool `json:"stop,omitempty"`
+	Name          string `json:"name,omitempty"`
+	HasAzimuth    bool   `json:"has_azimuth,omitempty"`
+	HasElevation  bool   `json:"has_elevation,omitempty"`
+	Azimuth       int    `json:"azimuth,omitempty"`
+	Elevation     int    `json:"elevation,omitempty"`
+	StopAzimuth   bool   `json:"stop_azimuth,omitempty"`
+	StopElevation bool   `json:"stop_elevation,omitempty"`
+	Stop          bool   `json:"stop,omitempty"`
 }
 
-// Info contains the meta data of a rotator
+// Info exports all the attributes of a rotator.
 type Info struct {
 	Name         string `json:"name,omitempty"`
 	Description  string `json:"description,omitempty"`
@@ -62,4 +64,8 @@ type Info struct {
 	AzimuthStop  int    `json:"azimuth_stop,omitempty"`
 	ElevationMin int    `json:"elevation_min,omitempty"`
 	ElevationMax int    `json:"elevation_max,omitempty"`
+	Azimuth      int    `json:"azimuth"`
+	AzPreset     int    `json:"az_preset"`
+	Elevation    int    `json:"elevation"`
+	ElPreset     int    `json:"el_preset"`
 }

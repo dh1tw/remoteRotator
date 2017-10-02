@@ -1,15 +1,21 @@
+@font-face {
+    font-family: 'Inconsolata';
+    src: url('/static/fonts/Inconsolata-Regular.ttf') format('truetype');
+}
 
 body {
     padding-top: 20px;
-    font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+    /* font: 14px "Lucida Grande", Helvetica, Arial, sans-serif; */
+    font: 18px "Inconsolata", monospaced;
     background-color: black;
 }
 
 #app {
-    width: 100%;
+    width: fit-content;
     margin-left: auto;
     margin-right: auto;
     padding-left: 20px;
+    padding-right: 20px;
 }
 
 .main-rotator {
@@ -17,10 +23,9 @@ body {
     min-width: 220px;
 }
 
-#azimuth-rotator {
-
+#azimuth-rotator h3{
+    font-size: 28px;
 }
-
 
 .main-rotator .name {
     color: white;
@@ -37,11 +42,21 @@ body {
     padding-right: 10px;
 }
 
+#mini-rotators ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+.mini-rotator-btn{
+    font-size: 18px;
+}
+
 .mini-rotator-btn.active,
 #mini-rotator-btn.btn:active {
     background-color: #5cb85c;
     color: white;
-    border-color: #26BBA6;
+    border-color: #3C753C;
+    outline:none !important;
 }
 
 .hidden {
@@ -49,17 +64,16 @@ body {
     visibility: hidden;
 }
 
-
 #mini-rotators {
     border-top: 5px solid white;
     margin: 5px 0 15px 0;
     padding-top: 15px;
-    width: 275px;
+    /* display: inline-block; */
+    /* width: inherit; */
+    /* min-width: 220px; */
 }
 
 .mini-rotator {
-    width: 80px;
-    height: 105px;
     float: left;
     margin: 5px 5px 5px 5px;
 }
@@ -68,7 +82,9 @@ body {
     color: white;
     text-align: center;
     margin-bottom: 5px;
-    width: 80px;
+    padding-left: 5px;
+    padding-right: 5px;
+    width: 100%;
 }
 
 .mini-rotator-canvas {
@@ -86,20 +102,6 @@ body {
     position: fixed;
     bottom: 0px;
 }
-
-.modal-input {
-    width: 100%;
-    padding: 5px;
-}
-
-.settings-input {
-    margin-bottom: 15px;
-}
-
-.mynavbar .settings {
-    cursor: pointer;
-}
-
 
 #connection {
     bottom: 0px;

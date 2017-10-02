@@ -17,7 +17,7 @@ import (
 // Ars is the implementation of the Rotator interface for EA4TX's
 // Antenna Rotator System (ARS)
 type Ars struct {
-	sync.Mutex
+	sync.RWMutex
 	name            string
 	description     string
 	azimuthMin      int
@@ -345,29 +345,31 @@ func (r *Ars) setValueAndCallEvent(ev rotator.Event, value int) {
 
 // Name returns the name of the rotator
 func (r *Ars) Name() string {
+	r.RLock()
+	defer r.Unlock()
 	return r.name
 }
 
 // Azimuth returns the current horizontal heading of the rotator in degrees
 func (r *Ars) Azimuth() int {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	return r.azimuth
 }
 
 // AzPreset returns the horizontal heading (preset) to which the rotator
 // shall turn to
 func (r *Ars) AzPreset() int {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	return r.azPreset
 }
 
 // HasAzimuth returns a boolean value indicating if this rotator supports
 // horizontal rotation
 func (r *Ars) HasAzimuth() bool {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	return r.hasAzimuth
 }
 
@@ -401,24 +403,24 @@ func (r *Ars) SetAzimuth(az int) error {
 
 // Elevation returns the current vertical elevation of the rotator in degrees
 func (r *Ars) Elevation() int {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	return r.elevation
 }
 
 // ElPreset returns the vertical elevation (preset) to which the rotator
 // shall turn to
 func (r *Ars) ElPreset() int {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	return r.elPreset
 }
 
 // HasElevation returns a boolean value indicating if this rotator supports
 // vertical rotation
 func (r *Ars) HasElevation() bool {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	return r.hasElevation
 }
 
@@ -426,8 +428,8 @@ func (r *Ars) HasElevation() bool {
 // rotator shall turn to. Allowed values are 0 ... 180. Values outside
 // of this range will be clipped.
 func (r *Ars) SetElevation(el int) error {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 
 	if !r.hasElevation {
 		return nil
@@ -497,8 +499,8 @@ func (r *Ars) StopElevation() error {
 // Status returns a a rotator.Status struct with the information
 // of this rotator.
 func (r *Ars) Status() rotator.Status {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	return r.serialize()
 }
 
@@ -549,8 +551,8 @@ func (r *Ars) ExecuteRequest(req rotator.Request) error {
 
 // Info returns a rotator.Info struct with the current values of the rotator
 func (r *Ars) Info() rotator.Info {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 
 	info := rotator.Info{
 		Name:         r.name,
@@ -562,6 +564,10 @@ func (r *Ars) Info() rotator.Info {
 		AzimuthStop:  r.azimuthStop,
 		ElevationMin: r.elevationMin,
 		ElevationMax: r.elevationMax,
+		Azimuth:      r.azimuth,
+		AzPreset:     r.azPreset,
+		Elevation:    r.elevation,
+		ElPreset:     r.elPreset,
 	}
 	return info
 }

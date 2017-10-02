@@ -1,12 +1,26 @@
 var AzimuthRotator = {
     // Vue.component('azimuth-rotator', {
-    template: '<div id="azimuth-rotator"><h3 class="name">{{name}}</h3><canvas class="rotator-canvas" ref="azimuthRotator" v-bind:height="canvasSize" v-bind:width="canvasSize"></canvas></div>',
+    template: '<canvas class="rotator-canvas" ref="azimuthRotator" v-bind:height="canvasSize" v-bind:width="canvasSize"></canvas>',
     props: {
         name: String,
         heading: Number,
         preset: Number,
         enabled: Boolean,
         canvasSize: Number,
+        min: Number,
+        max: Number,
+        // stop: {
+        //     default: 225,
+        //     type: Number,
+        // },
+        showHeading: {
+            default: true,
+            type: Boolean,
+        },
+        showLegend: {
+            default: true,
+            type: Boolean,
+        },
     },
     data: function () {
         return {
@@ -14,10 +28,7 @@ var AzimuthRotator = {
             ctx: null,
             canvasOptions: {
                 scale: this.canvasSize / 100,
-                font: "normal 14pt Arial",
                 color: "#FFF",
-                needleColor: "red",
-                needleColorRing: "yellow",
                 lineWidth: 3,
             },
             headingNeedleOptions: {
@@ -25,15 +36,13 @@ var AzimuthRotator = {
                 needleColorRing: "yellow",
             },
             presetNeedleOptions: {
-                scale: this.canvasSize / 100,
-                font: "normal 14pt Arial",
                 color: "yellow",
-                lineWidth: 3
             }
         }
     },
     computed: {
-        turning: function () {
+        // returns if the rotator is turning
+        isTurning: function () {
             if (Math.abs(this.heading - this.preset) >= 3) {
                 return true;
             }
@@ -43,30 +52,52 @@ var AzimuthRotator = {
     mounted: function () {
         this.canvas = this.$refs.azimuthRotator;
         this.ctx = this.canvas.getContext("2d");
-        this.drawRotator(0, 0, false);
+        this.drawRotator(this.heading, this.preset, true);
         this.addCanvasClickHandler();
     },
     methods: {
-        setHeading: function (heading) {
-            this.drawHeading(heading, this.preset, true);
+
+        // calculate the width of the heading needle (depends on the canvas size)
+        headingNeedleWidth: function(){
+            if (this.canvasSize > 100) {
+                return this.canvasSize / 30;
+            }
+            return 7
         },
 
-        // draw the heading and preset. Through indicatorsEnabled the heading and
+        // calculate the width of the preset needle (depends on the canvas size)
+        presetNeedleWidth: function(){
+            if (this.canvasSize > 100) {
+                return this.canvasSize / 80;
+            }
+            return 3
+        },
+
+        // calculate the font size (depends on the canvas size)
+        headingFont: function(){
+            return "normal " + this.canvasSize / 15 + "pt Inconsolata";
+        },
+
+        // draw the heading and preset. Through needlesEnabled the heading and
         // preset needle are enabled/disabled.
         // heading (Number)
         // preset (Number)
-        // indicatorNnabled (boolean)
+        // needlesEnabled (boolean)
         drawRotator: function (heading, preset, needlesEnabled) {
             // each time we draw something on the canvas we have to clear it
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
             this.drawCompass();
+            
+            // if (needlesEnabled) {
+            //     this.drawStop();
+            // }
 
             if (needlesEnabled) {
                 this.drawHeadingNeedle(heading);
             }
 
-            if (this.turning && needlesEnabled) {
+            if (this.isTurning && needlesEnabled) {
                 this.drawPreset(preset, this.presetOptions);
             }
         },
@@ -93,7 +124,6 @@ var AzimuthRotator = {
         },
 
         getMousePosition: function (canvas, evt) {
-
             var rect = canvas.getBoundingClientRect();
             return {
                 x: evt.clientX - rect.left,
@@ -101,19 +131,13 @@ var AzimuthRotator = {
             };
         },
 
-        // draw a compass like canvas to indicate the rotator heading
+        // draw the base a compass ring with 45° ticks
         drawCompass() {
-
-            if (this.canvasOptions.drawLegend != null) {
-                var drawLegend = this.canvasOptions.drawLegend;
-            } else {
-                var drawLegend = true;
-            }
 
             var cx = 100 * this.canvasOptions.scale; //canvas x size 
             var cy = 100 * this.canvasOptions.scale; //canvas y size
             var r = 45 * this.canvasOptions.scale; //radius
-            var font = this.canvasOptions.font;
+            var font = this.headingFont();
             var color = this.canvasOptions.color;
             var needleColor = this.canvasOptions.needleColor;
             var needleColorRing = this.canvasOptions.needleColorRing;
@@ -173,59 +197,45 @@ var AzimuthRotator = {
             this.ctx.restore();
 
             //North East South West Labels
-            if (drawLegend) {
+            if (this.showLegend) {
                 this.ctx.font = font;
                 this.ctx.fillStyle = color;
-                this.ctx.fillText("W", 16 * this.canvasOptions.scale, (cy / 2) + 5);
-                this.ctx.fillText("N", cx / 2 - 6, 25 * this.canvasOptions.scale);
-                this.ctx.fillText("E", cx - 22 * this.canvasOptions.scale, cy / 2 + 5);
-                this.ctx.fillText("S", cx / 2 - 5, cy - 17 * this.canvasOptions.scale);
-                this.ctx.fillStyle = "red";
-                this.ctx.font = font;
+                var txt = "M"; // since we use Monospace font, all letters have the same vertical/horizontal size
+                this.ctx.fillText("N", cx / 2 - this.ctx.measureText(txt).width / 2, 25 * this.canvasOptions.scale);
+                this.ctx.fillText("S", cx / 2 - this.ctx.measureText(txt).width / 2, cy - 17 * this.canvasOptions.scale);
+                this.ctx.fillText("W", 16 * this.canvasOptions.scale, (cy / 2) + this.ctx.measureText(txt).width / 2);
+                this.ctx.fillText("E", cx - 22 * this.canvasOptions.scale, (cy / 2) + this.ctx.measureText(txt).width / 2);
             }
-
-            this.ctx.save();
-
-            //inner ring around compass needle
-            this.ctx.translate(0, 0);
-            this.ctx.beginPath();
-            this.ctx.arc(cx / 2, cy / 2, 4, 0, 2 * Math.PI);
-            this.ctx.fillStyle = needleColorRing;
-            this.ctx.fill();
-            this.ctx.closePath();
-
-            this.ctx.restore();
-
         },
 
         drawHeadingNeedle: function (heading) {
 
             var scale = this.canvasOptions.scale;
-
+            
+            var color = this.headingNeedleOptions.needleColor;
             var cx = 100 * scale; //canvas x size 
             var cy = 100 * scale; //canvas y size
             var r = 45 * scale; //radius
 
-            if ((heading < 130) || (heading > 240)) {
-                if (heading >= 100) {
-                    this.ctx.fillText(heading + "°", cx / 2 - 15, cy - 30 * this.canvasOptions.scale);
-                } else if ((heading < 100) && (heading >= 10)) {
-                    this.ctx.fillText(heading + "°", cx / 2 - 9, cy - 30 * this.canvasOptions.scale);
+            // draw heading digits if enabled
+            if (this.showHeading) {
+                this.ctx.fillStyle = color;
+                if ((heading < 130) || (heading > 240)) {
+                    this.ctx.fillText(heading + "°", cx / 2 - this.ctx.measureText(heading).width / 2, cy - 30 * this.canvasOptions.scale);
                 } else {
-                    this.ctx.fillText(heading + "°", cx / 2 - 7, cy - 30 * this.canvasOptions.scale);
+                    this.ctx.fillText(heading + "°", cx / 2 - this.ctx.measureText(heading).width / 2, 40 * this.canvasOptions.scale);
                 }
-            } else {
-                this.ctx.fillText(heading + "°", cx / 2 - 15, 40 * this.canvasOptions.scale);
             }
 
             this.ctx.save();
-
+            var lineWidth = this.headingNeedleWidth(); 
             this.ctx.translate(cx / 2, cy / 2);
             this.ctx.rotate(heading * Math.PI / 180 + Math.PI);
             this.ctx.beginPath();
-            this.ctx.moveTo(-6, 0);
+            this.ctx.moveTo(-lineWidth, 0);
             this.ctx.lineTo(0, r);
-            this.ctx.lineTo(6, 0);
+            this.ctx.lineTo(lineWidth, 0);
+
             this.ctx.fillStyle = this.headingNeedleOptions.needleColor;
             this.ctx.closePath();
             this.ctx.fill();
@@ -234,7 +244,7 @@ var AzimuthRotator = {
 
             //outer ring around compass needle
             this.ctx.beginPath();
-            this.ctx.arc(cx / 2, cy / 2, 6, 0, 2 * Math.PI);
+            this.ctx.arc(cx / 2, cy / 2, lineWidth, 0, 2 * Math.PI);
             this.ctx.fillStyle = this.headingNeedleOptions.needleColor;
             this.ctx.fill();
             this.ctx.closePath();
@@ -248,7 +258,7 @@ var AzimuthRotator = {
             //inner ring around compass needle
             this.ctx.translate(0, 0);
             this.ctx.beginPath();
-            this.ctx.arc(cx / 2, cy / 2, 4, 0, 2 * Math.PI);
+            this.ctx.arc(cx / 2, cy / 2, lineWidth/2, 0, 2 * Math.PI);
             this.ctx.fillStyle = this.headingNeedleOptions.needleColorRing;
             this.ctx.fill();
             this.ctx.closePath();
@@ -263,7 +273,7 @@ var AzimuthRotator = {
 
             var font = this.presetNeedleOptions.font;
             var color = this.presetNeedleOptions.color;
-            var lineWidth = this.presetNeedleOptions.lineWidth;
+            var lineWidth = this.presetNeedleWidth();
 
             var radians = degrees * Math.PI / 180;
             var outerX = cx / 2 + r * Math.cos(radians);
@@ -285,7 +295,40 @@ var AzimuthRotator = {
             this.ctx.stroke();
 
             this.ctx.restore();
-        }
+        },
+
+        // drawStop: function () {
+        //     var scale = this.canvasOptions.scale;
+
+        //     var cx = 100 * scale; //canvas x size 
+        //     var cy = 100 * scale; //canvas y size
+        //     var r = 45 * scale; //radius
+
+        //     var color = "blue";
+        //     var lineWidth = 2;
+
+        //     var radians = this.stop * Math.PI / 180;
+        //     var outerX = cx / 2 + r * Math.cos(radians);
+        //     var outerY = cy / 2 + r * Math.sin(radians);
+
+        //     this.ctx.save()
+        //     this.ctx.setLineDash([5, 5]);
+        //     this.ctx.translate(cx / 2, cy / 2);
+        //     this.ctx.rotate(this.stop * Math.PI / 180 + Math.PI);
+        //     this.ctx.beginPath();
+        //     this.ctx.strokeStyle = color;
+        //     this.ctx.lineWidth = lineWidth;
+        //     this.ctx.moveTo(0, 0);
+        //     this.ctx.lineTo(0, r - 2 * scale);
+        //     // this.ctx.moveTo(-1 * scale, r - 5 * scale);
+        //     // this.ctx.lineTo(0, r - 2 * scale);
+        //     // this.ctx.lineTo(1 * scale, r - 5 * scale);
+        //     // this.ctx.fillStyle = color;
+        //     this.ctx.closePath();
+        //     this.ctx.stroke();
+
+        //     this.ctx.restore();
+        // }
     },
     watch: {
         heading: function (newHeading, oldHeading) {
@@ -298,8 +341,13 @@ var AzimuthRotator = {
             this.drawRotator(this.heading, this.preset, this.enabled);
         },
         canvasSize: function (newCanvasSize) {
-            this.canvasOptions["scale"] = newCanvasSize / 100;
-            this.drawRotator(this.heading, this.preset, this.enabled);
+            console.log("new canvas size:", newCanvasSize);
+            this.$set(this.canvasOptions, "scale", newCanvasSize / 100);
+
+            // wait one tick until the canvas has been re-initialized
+            Vue.nextTick(()=> {
+                this.drawRotator(this.heading, this.preset, this.enabled);
+            });
         }
     }
 }

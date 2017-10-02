@@ -6,6 +6,7 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <title>RemoteRotator WebUI</title>
+  <link rel="css?family=Inconsolata" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/font-awesome.min.css">
   <link rel="stylesheet" href="/static/css/bootstrap.min.css">
   <link rel="stylesheet" href="/static/css/style.css">
@@ -14,10 +15,26 @@
 <body>
   <div id="app">
     <div class="main-rotator">
-      <azimuth-rotator v-on:set-azimuth="setAzimuth" :name="azName" :heading="azHeading" :preset="azPreset" :enabled="azEnabled"
-        :canvas-size="azCanvasSize"></azimuth-rotator>
+      <div id="azimuth-rotator">
+        <h3 class="name">{{selectedAzRotator.name}}</h3>
+      </div>
+      <azimuth-rotator v-on:set-azimuth="setAzimuth" :name="selectedAzRotator.name" :heading="selectedAzRotator.azimuth" :preset="selectedAzRotator.az_preset"
+        :enabled="azEnabled" :canvas-size="azCanvasSize">
+      </azimuth-rotator>
     </div>
-    <div id="mini-rotators" class="hidden">
+    <div id="mini-rotators" v-if="Object.keys(rotators).length > 1">
+      <ul>
+        <li v-for="rotator in sortedRotators">
+          <div class="mini-rotator">
+            <button type='button' class='btn btn-primary btn-sm mini-rotator-btn' v-bind:class="{active : selectedAzRotator.name == rotator.name }"
+              v-on:click="setAzRotator(rotator.name) ">{{rotator.name}}</button>
+            <div class='mini-rotator-canvas'>
+              <azimuth-rotator :name="rotator.name" :heading="rotator.azimuth" :preset="rotator.az_preset" :enabled=true :show-heading=false
+              v-on:set-azimuth="setAzimuth" :canvas-size=100></azimuth-rotator>
+            </div>
+          </div>
+        </li>
+      </ul>
     </div>
     <div id="connection">
       <p id="connected" class="bg-success" v-bind:class="{'hidden': hideConnectionMsg}" v-if="connected">

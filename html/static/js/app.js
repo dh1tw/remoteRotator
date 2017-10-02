@@ -2,11 +2,20 @@ var vm = new Vue({
     el: '#app',
 
     data: {
-        ws: null, // Our websocket
+        ws: null, // websocket
         rotators: {},
-        azName: "n/a",
-        azHeading: 0,
-        azPreset: 0,
+        selectedAzRotator: {
+            name: "n/a",
+            azimuth: 0,
+            az_preset: 0,
+            az_stop: 0,
+            az_min: 0,
+            az_max: 450,
+            elevation: 0,
+            el_preset: 0,
+            has_azimuth: true,
+            has_elevation: false,
+        },
         azEnabled: false,
         azCanvasSize: 400,
         hideConnectionMsg: false,
@@ -15,48 +24,55 @@ var vm = new Vue({
     components: {
         'azimuth-rotator': AzimuthRotator,
     },
-    beforeCreate: function () {},
     created: function () {
         window.addEventListener('resize', this.getWindowSize);
         this.resizeWindow();
     },
     mounted: function () {
-        this.getRotators();
+        this.openWebsocket();
     },
     methods: {
-
-        // Make and Ajax request to the server to get a list
-        // of all available rotators
-        getRotators: function () {
-            this.$http.get("/info").then(rotators => {
-                rotatorInfo = JSON.parse(rotators.bodyText);
-                if (Object.prototype.toString.call(rotatorInfo) === '[object Array]') {
-                    for (i = 0; i < rotatorInfo.length; i++) {
-                        this.addRotator(rotatorInfo[i]);
-                    }
-                } else {
-                    this.addRotator(rotatorInfo);
-                }
-
-                // TBD check if a rotator has disappeared
-
-                if (this.ws == null) {
-                    this.openWebsocket();
-                }
-            });
-        },
 
         // add a rotator
         addRotator: function (rotator) {
 
-            this.rotators[rotator.name] = rotator;
+            if (!(rotator.name in this.rotators)) {
+                this.$set(this.rotators, rotator.name, rotator);
+                console.log(rotator);
+            }
 
             // if this is the first rotator, set the main azimuth rotator component
-            if (this.azName === "n/a" && rotator.has_azimuth) {
-                this.azName = rotator.name;
-                this.azHeading = 0;
-                this.azPreset = 0;
-                this.azEnabled = false;
+            if (this.selectedAzRotator.name === "n/a" && rotator.has_azimuth) {
+                this.azEnabled = true;
+                this.selectedAzRotator = rotator;
+            }
+        },
+
+        // remove a rotator
+        removeRotator: function (rotator) {
+
+            if (rotator.name in this.rotators) {
+                
+                this.$delete(this.rotators, rotator.name);
+
+                if (Object.keys(this.rotators).length > 0){
+                    if (this.selectedAzRotator.name == rotator.name){
+                        this.selectedAzRotator = this.rotators[Object.keys(this.rotators)[0]];
+                    }                
+                } else {
+                    // no more rotators left
+                    this.selectedAzRotator = {
+                        name: "n/a",
+                        azimuth: 0,
+                        az_preset: 0,
+                        az_stop: 0,
+                        elevation: 0,
+                        el_preset: 0,
+                        has_azimuth: true,
+                        has_elevation: false,
+                    }
+                    this.azEnabled = false;
+                }
             }
         },
 
@@ -64,29 +80,25 @@ var vm = new Vue({
         // for rotators
         openWebsocket: function () {
             this.ws = new ReconnectingWebSocket('ws://' + window.location.host + '/ws');
-
             this.ws.addEventListener('message', function (e) {
-                var rotatorsMsg = JSON.parse(e.data);
+                var eventMsg = JSON.parse(e.data);
 
-                for (i = 0; i < rotatorsMsg.length; i++) {
-                    newRotator = rotatorsMsg[i]
-                    if (newRotator.name in this.rotators) {
+                if (eventMsg['name'] == 'add') {
+                    this.addRotator(eventMsg['rotator']);
+                } else if (eventMsg['name'] == 'remove') {
+                    this.removeRotator(eventMsg['rotator']);
+                } else if (eventMsg['name'] == 'heading') {
+                    newHeading = eventMsg['status']
+                    if (newHeading.name in this.rotators) {
                         // copy values
-                        var rotator = this.rotators[newRotator.name]
+                        var rotator = this.rotators[newHeading.name]
                         if (rotator.has_azimuth) {
-                            rotator.azimuth = newRotator.azimuth;
-                            rotator.az_preset = newRotator.az_preset;
+                            this.$set(this.rotators[newHeading.name], 'azimuth', newHeading.azimuth);
+                            this.$set(this.rotators[newHeading.name], 'az_preset', newHeading.az_preset);
                         }
                         if (rotator.has_elevation) {
-                            rotator.elevation = newRotator.elevation;
-                            rotator.el_preset = newRotator.el_preset;
-                        }
-
-                        // update the main azimuth rotator component
-                        if (newRotator.name == this.azName) {
-                            this.azHeading = newRotator.azimuth;
-                            this.azPreset = newRotator.az_preset;
-                            this.azEnabled = true;
+                            this.$set(this.rotators[newHeading.name], 'elevation', newHeading.elevation);
+                            this.$set(this.rotators[newHeading.name], 'el_preset', newHeading.el_preset);
                         }
                     }
                 }
@@ -105,6 +117,13 @@ var vm = new Vue({
             }.bind(this));
         },
 
+        // set the active azimuth rotator
+        setAzRotator: function (name) {
+            if (name in this.rotators) {
+                this.selectedAzRotator = this.rotators[name]
+            }
+        },
+
         // send a request to the server to set azimuth
         setAzimuth: function (name, heading) {
             var msg = {
@@ -115,10 +134,14 @@ var vm = new Vue({
             var data = JSON.stringify(msg);
             this.ws.send(data);
         },
+
+        // helper funtion for resizing window. This function reduces
+        // the amount of resize events to just one.
         getWindowSize: function () {
             clearTimeout(this.resizeTimeout);
             this.resizeTimeout = setTimeout(this.resizeWindow, 400);
         },
+
         resizeWindow: function (event) {
 
             var width = document.documentElement.clientWidth;
@@ -129,13 +152,22 @@ var vm = new Vue({
             } else {
                 this.azCanvasSize = document.documentElement.clientWidth - 70;
             }
-        }
-
+            this.$forceUpdate();
+        },
     },
     beforeDestroy() {
         window.removeEventListener('resize', this.getWindowWidth);
     },
-    watch: {
+    computed: {
+        // order the rotators alphabetically
+        sortedRotators: function () {
+            var rotators = this.rotators;
 
+            const ordered = {};
+            Object.keys(rotators).sort().forEach(function (key) {
+                ordered[key] = rotators[key];
+            });
+            return ordered;
+        },
     }
 });
