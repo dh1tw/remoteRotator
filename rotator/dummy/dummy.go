@@ -1,6 +1,7 @@
 package dummy
 
 import (
+	"math"
 	"sync"
 	"time"
 
@@ -13,10 +14,10 @@ type Dummy struct {
 	sync.RWMutex
 	eventHandler   func(rotator.Rotator, rotator.Event, ...interface{})
 	name           string
-	description    string
 	azimuthMin     int
 	azimuthMax     int
 	azimuthStop    int
+	azimuthOverlap bool
 	elevationMin   int
 	elevationMax   int
 	azimuth        float32
@@ -54,10 +55,45 @@ func HasElevation(set bool) func(*Dummy) {
 	}
 }
 
+// AzimuthMin is a functional option to set the minimum azimuth angle.
+func AzimuthMin(min int) func(*Dummy) {
+	return func(r *Dummy) {
+		r.azimuthMin = min
+	}
+}
+
+// AzimuthMax is a functional option to set the maximum azimuth angle.
+func AzimuthMax(max int) func(*Dummy) {
+	return func(r *Dummy) {
+		r.azimuthMax = max
+	}
+}
+
+// AzimuthStop is a functional option to set the mechanical stop of the rotator.
+func AzimuthStop(stop int) func(*Dummy) {
+	return func(r *Dummy) {
+		r.azimuthStop = stop
+	}
+}
+
 // AzimuthSpeed sets the simulated speed of the rotator in degrees / second
 func AzimuthSpeed(speed int) func(*Dummy) {
 	return func(r *Dummy) {
 		r.azSpeed = float32(speed)
+	}
+}
+
+// ElevationMin is a functional option to set the minimum elevation angle.
+func ElevationMin(min int) func(*Dummy) {
+	return func(r *Dummy) {
+		r.elevationMin = min
+	}
+}
+
+// ElevationMax is a functional option to set the maximum elevation angle.
+func ElevationMax(max int) func(*Dummy) {
+	return func(r *Dummy) {
+		r.elevationMax = max
 	}
 }
 
@@ -90,7 +126,7 @@ func NewDummyRotator(options ...func(*Dummy)) (*Dummy, error) {
 
 	r := &Dummy{
 		hasAzimuth:     true,
-		azimuthMax:     450,
+		azimuthMax:     360,
 		elevationMax:   180,
 		azSpeed:        8,
 		elSpeed:        5,
@@ -99,6 +135,16 @@ func NewDummyRotator(options ...func(*Dummy)) (*Dummy, error) {
 
 	for _, opt := range options {
 		opt(r)
+	}
+
+	if r.azimuthMin > 0 {
+		r.azPreset = float32(r.azimuthMin)
+		r.azimuth = float32(r.azimuthMin)
+	}
+
+	if r.elevationMin > 0 {
+		r.elPreset = float32(r.elevationMin)
+		r.elevation = float32(r.elevationMin)
 	}
 
 	return r, nil
@@ -174,6 +220,51 @@ func (r *Dummy) SetAzimuth(az int) error {
 	r.Lock()
 	defer r.Unlock()
 
+	if !r.hasAzimuth {
+		return nil
+	}
+
+	if az > r.azimuthMax {
+		az = r.azimuthMax
+	}
+
+	if az < r.azimuthMin {
+		az = r.azimuthMin
+	}
+
+	abs := math.Abs(float64(r.azimuthMax - r.azimuthMin))
+
+	// if rotation is only allowed on less than 360°
+	if abs < 360 {
+
+		// special case: overlapping 0°
+		if r.azimuthMin > r.azimuthMax {
+			if az >= r.azimuthMin || az <= r.azimuthMax {
+				r.azPreset = float32(az)
+				return nil
+			}
+
+			if math.Abs(float64(az-r.azimuthMin)) < math.Abs(float64(az-r.azimuthMax)) {
+				r.azPreset = float32(r.azimuthMin)
+			} else {
+				r.azPreset = float32(r.azimuthMax)
+			}
+			return nil
+		}
+
+		if az >= r.azimuthMin && az <= r.azimuthMax {
+			r.azPreset = float32(az)
+			return nil
+		}
+
+		if math.Abs(float64(az-r.azimuthMin)) < math.Abs(float64(az-r.azimuthMax)) {
+			r.azPreset = float32(r.azimuthMin)
+		} else {
+			r.azPreset = float32(r.azimuthMax)
+		}
+		return nil
+	}
+
 	r.azPreset = float32(az)
 	return nil
 }
@@ -200,7 +291,26 @@ func (r *Dummy) SetElevation(el int) error {
 	r.Lock()
 	defer r.Unlock()
 
-	r.elPreset = float32(el)
+	if !r.hasElevation {
+		return nil
+	}
+
+	if el > 180 {
+		el = 180
+	}
+
+	if el < 0 {
+		el = 0
+	}
+
+	if el < r.elevationMin {
+		r.elPreset = float32(r.elevationMin)
+	} else if el > r.elevationMax {
+		r.elPreset = float32(r.elevationMax)
+	} else {
+		r.elPreset = float32(el)
+	}
+
 	return nil
 }
 
@@ -210,6 +320,9 @@ func (r *Dummy) StopAzimuth() error {
 	defer r.Unlock()
 
 	r.azPreset = r.azimuth
+	if r.eventHandler != nil {
+		r.eventHandler(r, rotator.Azimuth, r.status())
+	}
 
 	return nil
 }
@@ -220,6 +333,9 @@ func (r *Dummy) StopElevation() error {
 	defer r.Unlock()
 
 	r.elPreset = r.elevation
+	if r.eventHandler != nil {
+		r.eventHandler(r, rotator.Elevation, r.status())
+	}
 	return nil
 }
 
@@ -230,17 +346,23 @@ func (r *Dummy) Stop() error {
 
 	r.elPreset = r.elevation
 	r.azPreset = r.azimuth
+	if r.eventHandler != nil {
+		status := r.status()
+		r.eventHandler(r, rotator.Azimuth, status)
+		r.eventHandler(r, rotator.Elevation, status)
+	}
 
 	return nil
 }
 
 func (r *Dummy) status() rotator.Status {
 	return rotator.Status{
-		Name:      r.name,
-		Azimuth:   int(r.azimuth),
-		AzPreset:  int(r.azPreset),
-		Elevation: int(r.elevation),
-		ElPreset:  int(r.elPreset),
+		Name:           r.name,
+		Azimuth:        int(r.azimuth),
+		AzPreset:       int(r.azPreset),
+		AzimuthOverlap: r.azimuthOverlap,
+		Elevation:      int(r.elevation),
+		ElPreset:       int(r.elPreset),
 	}
 }
 
@@ -293,19 +415,19 @@ func (r *Dummy) Info() rotator.Info {
 	defer r.RUnlock()
 
 	return rotator.Info{
-		Name:         r.name,
-		Description:  r.description,
-		HasAzimuth:   r.hasAzimuth,
-		HasElevation: r.hasElevation,
-		AzimuthMin:   r.azimuthMin,
-		AzimuthMax:   r.azimuthMax,
-		AzimuthStop:  r.azimuthStop,
-		ElevationMin: r.elevationMin,
-		ElevationMax: r.elevationMax,
-		Azimuth:      int(r.azimuth),
-		AzPreset:     int(r.azPreset),
-		Elevation:    int(r.elevation),
-		ElPreset:     int(r.elPreset),
+		Name:           r.name,
+		HasAzimuth:     r.hasAzimuth,
+		HasElevation:   r.hasElevation,
+		AzimuthMin:     r.azimuthMin,
+		AzimuthMax:     r.azimuthMax,
+		AzimuthStop:    r.azimuthStop,
+		AzimuthOverlap: r.azimuthOverlap,
+		ElevationMin:   r.elevationMin,
+		ElevationMax:   r.elevationMax,
+		Azimuth:        int(r.azimuth),
+		AzPreset:       int(r.azPreset),
+		Elevation:      int(r.elevation),
+		ElPreset:       int(r.elPreset),
 	}
 }
 
@@ -319,9 +441,8 @@ func (r *Dummy) updateHeadings() {
 func (r *Dummy) updateAzimuth() {
 
 	if r.hasAzimuth {
-		v, changed := calcNewHeading(r.azimuth, r.azPreset, r.azSpeed, r.tickerInterval)
+		changed := r.calcNewAzHeading()
 		if changed {
-			r.azimuth = v
 			r.eventHandler(r, rotator.Azimuth, r.status())
 		}
 	}
@@ -330,22 +451,186 @@ func (r *Dummy) updateAzimuth() {
 func (r *Dummy) updateElevation() {
 
 	if r.hasElevation {
-		v, changed := calcNewHeading(r.elevation, r.elPreset, r.elSpeed, r.tickerInterval)
+		changed := r.calcNewElHeading()
 		if changed {
-			r.azimuth = v
-			r.eventHandler(r, rotator.Azimuth, r.status())
+			r.eventHandler(r, rotator.Elevation, r.status())
 		}
 	}
 }
 
-func calcNewHeading(position, preset, speed, interval float32) (float32, bool) {
+func (r *Dummy) calcNewElHeading() bool {
 
-	if int(position) == int(preset) {
-		return position, false
+	if int(r.elevation) == int(r.elPreset) {
+		return false
 	}
 
-	if preset > position {
-		return position + speed/(interval/10), true
+	moveCCW := false
+	moveCW := false
+
+	delta := r.elSpeed / (r.tickerInterval / 10)
+
+	min := float32(r.elevationMin)
+	max := float32(r.elevationMax)
+
+	if r.elPreset < r.elevation && r.elevation > min {
+		moveCCW = true
+	} else if r.elPreset > r.elevation && r.elevation < max {
+		moveCW = true
 	}
-	return position - speed/(interval/10), true
+
+	if moveCW {
+		r.elevation += delta
+	}
+
+	if moveCCW {
+		r.elevation -= delta
+	}
+
+	return true
+}
+
+func (r *Dummy) calcNewAzHeading() bool {
+
+	if int(r.azimuth) == int(r.azPreset) {
+		return false
+	}
+
+	moveCCW := false
+	moveCW := false
+
+	delta := r.azSpeed / (r.tickerInterval / 10)
+
+	abs := math.Abs(float64(r.azimuthMax - r.azimuthMin))
+
+	// if rotation is allowed on < 360°
+	if abs < 360 {
+		min := float32(r.azimuthMin)
+		max := float32(r.azimuthMax)
+
+		// max overlapping 0°
+		if min >= max {
+			if (r.azimuth >= min && r.azPreset < 360 && r.azPreset > r.azimuth) ||
+				(r.azimuth >= min && r.azPreset <= max) ||
+				(r.azimuth < max && r.azPreset > r.azimuth && r.azPreset <= max) {
+				moveCW = true
+			} else {
+				moveCCW = true
+			}
+		} else {
+			if r.azPreset > r.azimuth {
+				moveCW = true
+			} else {
+				moveCCW = true
+			}
+		}
+	} else { // rotation allowed on >= 360°
+		// moving CW or CCW?
+		if r.azPreset-r.azimuth > 0 {
+			if (float32(r.azimuthStop) < r.azPreset) && (float32(r.azimuthStop) > r.azimuth) {
+				moveCCW = true
+			} else {
+				moveCW = true
+			}
+		} else {
+			//crossing mechanical stop
+			if (float32(r.azimuthStop) > r.azPreset) && (float32(r.azimuthStop) < r.azimuth) {
+				moveCW = true
+			} else {
+				moveCCW = true
+			}
+		}
+	}
+	// } else { // rotation allowed on >= 360°
+	// 	azMax := r.azimuthMax - 360 + r.azimuthStop
+
+	// 	// overlap not crossing 0°
+	// 	if r.azimuthStop <= azMax {
+
+	// 		if r.azPreset > r.azimuth {
+	// 			fmt.Println("1")
+	// 			if r.azPreset < float32(azMax) && r.azimuth < float32(azMax) {
+	// 				fmt.Println("2")
+	// 				moveCW = true
+	// 				if int(r.azimuth) == r.azimuthStop {
+	// 					r.azimuthOverlap = true
+	// 					fmt.Println("3")
+	// 				}
+	// 			} else if r.azPreset > float32(azMax) && r.azimuth < float32(azMax) {
+	// 				fmt.Println("4")
+	// 				moveCCW = true
+	// 				if int(r.azimuth) > r.azimuthStop && !r.azimuthOverlap {
+	// 					moveCW = true
+	// 					// r.azimuthOverlap = true
+	// 					fmt.Println("5")
+	// 				} else if int(r.azimuth) > r.azimuthStop && r.azimuthOverlap {
+	// 					fmt.Println(55)
+	// 				} else {
+	// 					r.azimuthOverlap = false
+	// 					fmt.Println("6")
+	// 				}
+	// 			} else if r.azPreset > float32(azMax) && r.azimuth > float32(azMax) {
+	// 				fmt.Println("7")
+	// 				moveCCW = true
+	// 			} else {
+	// 				fmt.Println(100)
+	// 			}
+	// 		} else {
+	// 			if r.azPreset < float32(azMax) && r.azimuth < float32(azMax) {
+	// 				fmt.Println(10)
+	// 				// if int(r.azimuth) > r.azimuthStop && !r.azimuthOverlap {
+	// 				// 	fmt.Println(11)
+	// 				// 	moveCW = true
+	// 				if int(r.azimuth) == r.azimuthStop {
+	// 					r.azimuthOverlap = false
+	// 				}
+	// 				if int(r.azimuth) > r.azimuthStop {
+	// 					moveCCW = true
+	// 					fmt.Println(12)
+	// 					// } else if int(r.azimuth) < r.azimuthStop {
+	// 					// 	moveCCW = true
+	// 					// 	fmt.Println(122)
+	// 				} else {
+	// 					// r.azimuthOverlap = false
+	// 					fmt.Println(13)
+	// 					moveCCW = true
+	// 				}
+	// 			} else if r.azPreset > float32(r.azimuthStop) && r.azimuth > float32(r.azimuthStop) {
+	// 				fmt.Println(14)
+	// 				moveCCW = true
+	// 			} else if r.azPreset < float32(r.azimuthStop) && r.azimuth < float32(azMax) {
+	// 				moveCW = true
+	// 			} else {
+	// 				fmt.Println(200)
+	// 			}
+	// 			// moveCCW = true
+	// 			// fmt.Println("10")
+	// 		}
+	// 		// overlap crossing 0°
+	// 	} else if r.azimuthStop < azMax {
+
+	// 	}
+	// }
+
+	if moveCW {
+		// crossing from 359 -> 0
+		if r.azimuth <= 359 && r.azimuth+delta > 359 {
+			r.azimuth = delta
+			// fmt.Printf("%.2f\n", r.azimuth)
+			return true
+		}
+		r.azimuth += delta
+		// fmt.Printf("%.2f\n", r.azimuth)
+
+	} else if moveCCW {
+		// crossing from 0 <- 360
+		if r.azimuth >= 0 && r.azimuth-delta < 0 {
+			r.azimuth = 359 - delta
+			// fmt.Printf("%.2f\n", r.azimuth)
+			return true
+		}
+		r.azimuth -= delta
+		// fmt.Printf("%.2f\n", r.azimuth)
+	}
+
+	return true
 }

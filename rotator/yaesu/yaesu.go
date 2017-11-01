@@ -1,4 +1,4 @@
-package ars
+package yaesu
 
 import (
 	"bufio"
@@ -14,15 +14,14 @@ import (
 	"github.com/dh1tw/remoteRotator/rotator"
 )
 
-// Ars is the implementation of the Rotator interface for EA4TX's
-// Antenna Rotator System (ARS)
-type Ars struct {
+// Yaesu is the implementation of the Yaesu GS232A/B rotator protocol
+type Yaesu struct {
 	sync.RWMutex
 	name            string
-	description     string
 	azimuthMin      int
 	azimuthMax      int
 	azimuthStop     int
+	azimuthOverlap  bool
 	elevationMin    int
 	elevationMax    int
 	azimuth         int
@@ -46,101 +45,102 @@ type Ars struct {
 }
 
 // Name is a functional option to set the name of the rotator
-func Name(name string) func(*Ars) {
-	return func(r *Ars) {
+func Name(name string) func(*Yaesu) {
+	return func(r *Yaesu) {
 		r.name = name
 	}
 }
 
 // HasAzimuth is a functional option to enable Azimuth
-func HasAzimuth(set bool) func(*Ars) {
-	return func(r *Ars) {
+func HasAzimuth(set bool) func(*Yaesu) {
+	return func(r *Yaesu) {
 		r.hasAzimuth = set
 	}
 }
 
 // HasElevation is a functional option to enable Elevation
-func HasElevation(set bool) func(*Ars) {
-	return func(r *Ars) {
+func HasElevation(set bool) func(*Yaesu) {
+	return func(r *Yaesu) {
 		r.hasElevation = set
 	}
 }
 
 // UpdateInterval is a functional option the set the frequency
 // by which the rotator will be queried
-func UpdateInterval(d time.Duration) func(*Ars) {
-	return func(r *Ars) {
+func UpdateInterval(d time.Duration) func(*Yaesu) {
+	return func(r *Yaesu) {
 		r.pollingInterval = d
 	}
 }
 
 // EventHandler sets a callback function through which the rotator
 // will report Event
-func EventHandler(h func(rotator.Rotator, rotator.Event, ...interface{})) func(*Ars) {
-	return func(r *Ars) {
+func EventHandler(h func(rotator.Rotator, rotator.Event, ...interface{})) func(*Yaesu) {
+	return func(r *Yaesu) {
 		r.eventHandler = h
 	}
 }
 
 // Baudrate is a functional option to set the baurate of the serial port.
-func Baudrate(baudrate int) func(*Ars) {
-	return func(r *Ars) {
+func Baudrate(baudrate int) func(*Yaesu) {
+	return func(r *Yaesu) {
 		r.spBaudrate = baudrate
 	}
 }
 
 // Portname is a functional option to set the portname of the serial port.
 // On Windows this will be "COMx", on Linux & MacOS "/dev/tty/xxx"
-func Portname(pn string) func(*Ars) {
-	return func(r *Ars) {
+func Portname(pn string) func(*Yaesu) {
+	return func(r *Yaesu) {
 		r.spPortName = pn
 	}
 }
 
 // AzimuthMin is a functional option to set the minimum azimuth angle.
-func AzimuthMin(min int) func(*Ars) {
-	return func(r *Ars) {
+func AzimuthMin(min int) func(*Yaesu) {
+	return func(r *Yaesu) {
 		r.azimuthMin = min
 	}
 }
 
 // AzimuthMax is a functional option to set the maximum azimuth angle.
-func AzimuthMax(max int) func(*Ars) {
-	return func(r *Ars) {
+func AzimuthMax(max int) func(*Yaesu) {
+	return func(r *Yaesu) {
 		r.azimuthMax = max
 	}
 }
 
 // AzimuthStop is a functional option to set the mechanical stop of the rotator.
-func AzimuthStop(stop int) func(*Ars) {
-	return func(r *Ars) {
+func AzimuthStop(stop int) func(*Yaesu) {
+	return func(r *Yaesu) {
 		r.azimuthStop = stop
 	}
 }
 
 // ElevationMin is a functional option to set the minimum elevation angle.
-func ElevationMin(min int) func(*Ars) {
-	return func(r *Ars) {
+func ElevationMin(min int) func(*Yaesu) {
+	return func(r *Yaesu) {
 		r.elevationMin = min
 	}
 }
 
 // ElevationMax is a functional option to set the maximum elevation angle.
-func ElevationMax(max int) func(*Ars) {
-	return func(r *Ars) {
+func ElevationMax(max int) func(*Yaesu) {
+	return func(r *Yaesu) {
 		r.elevationMax = max
 	}
 }
 
-// NewArs creates a new Ars object which satisfies the rotator.Rotator interface.
-// Configuration settings are set through functional options. The the Ars
-// can not be initialized nil and the corresponding error will be returned.
+// NewYaesu creates a new Yaesu object which satisfies implicitely the
+// rotator.Rotator interface. Configuration settings are set through functional
+// options. The the Yaesu can not be initialized nil and the corresponding error
+// will be returned.
 // Default settings are:
 // hasAzimuth: true,
 // portname: /dev/ttyACM0,
 // pollingInterval: 5sec,
 // baudrate: 9600.
-func NewArs(opts ...func(*Ars)) (*Ars, error) {
+func NewYaesu(opts ...func(*Yaesu)) (*Yaesu, error) {
 
 	// regex Pattern [0-9]{4} -> 0310..etc
 	headingPattern, err := regexp.Compile("[\\d]{4}")
@@ -148,7 +148,7 @@ func NewArs(opts ...func(*Ars)) (*Ars, error) {
 		return nil, err
 	}
 
-	r := &Ars{
+	r := &Yaesu{
 		hasAzimuth:      true,
 		pollingInterval: time.Second * 5,
 		spPortName:      "/dev/ttyACM0",
@@ -181,7 +181,7 @@ func NewArs(opts ...func(*Ars)) (*Ars, error) {
 	return r, nil
 }
 
-func (r *Ars) close() {
+func (r *Yaesu) close() {
 	r.Lock()
 	defer r.Unlock()
 	if r.pollingTicker != nil {
@@ -192,8 +192,8 @@ func (r *Ars) close() {
 }
 
 // resetWatchdog resets the watchdog. This means that a packet has been
-// received from the ARS
-func (r *Ars) resetWatchdog() {
+// received from the Yaesu rotator
+func (r *Yaesu) resetWatchdog() {
 	r.Lock()
 	defer r.Unlock()
 	r.watchdogTs = time.Now()
@@ -201,7 +201,7 @@ func (r *Ars) resetWatchdog() {
 
 // checkWatchdog compares the watchdog timestamp with the current time
 // and returns true if this value is greater than 5x updateInterval.
-func (r *Ars) checkWatchdog() bool {
+func (r *Yaesu) checkWatchdog() bool {
 	r.Lock()
 	defer r.Unlock()
 	if time.Since(r.watchdogTs) > 5*r.pollingInterval {
@@ -211,19 +211,19 @@ func (r *Ars) checkWatchdog() bool {
 }
 
 // Start starts the main event loop for the serial port.
-// It will query the ARS for the current heading (azimuth + elevation)
+// It will query the Yaesu rotator for the current heading (azimuth + elevation)
 // with the pollingrate defined during initialization.
-// A watchdog detects if the ARS does not respond anymore.
+// A watchdog detects if the Yaesu rotator does not respond anymore.
 // If an error occures, the communication will be shut down and the
-// arsError channel will be closed.
-func (r *Ars) Start(arsError chan<- struct{}, shutdown <-chan struct{}) {
+// yaesuError channel will be closed.
+func (r *Yaesu) Start(yaesuError chan<- struct{}, shutdown <-chan struct{}) {
 	r.starter.Do(func() {
-		go r.start(arsError, shutdown)
+		go r.start(yaesuError, shutdown)
 	})
 }
 
-func (r *Ars) start(arsError chan<- struct{}, shutdown <-chan struct{}) {
-	defer close(arsError)
+func (r *Yaesu) start(yaesuError chan<- struct{}, shutdown <-chan struct{}) {
+	defer close(yaesuError)
 	defer r.close()
 
 	r.Lock()
@@ -240,7 +240,7 @@ func (r *Ars) start(arsError chan<- struct{}, shutdown <-chan struct{}) {
 				return
 			}
 			if r.checkWatchdog() {
-				fmt.Println("communication lost with ARS")
+				fmt.Println("communication lost with Yaesu rotator")
 				return
 			}
 		case <-shutdown:
@@ -264,15 +264,15 @@ func (r *Ars) start(arsError chan<- struct{}, shutdown <-chan struct{}) {
 	}
 }
 
-// read from the ARS through this wrapper function
-func (r *Ars) read() (string, error) {
+// read from the Yaesu rotator through this wrapper function
+func (r *Yaesu) read() (string, error) {
 	r.Lock()
 	defer r.Unlock()
 	return bufio.NewReader(r.sp).ReadString('\n')
 }
 
-// request Azimuth + Elevation from ARS
-func (r *Ars) query() error {
+// request Azimuth + Elevation from Yaesu rotator
+func (r *Yaesu) query() error {
 	//query azimuth + elevation
 	r.Lock()
 	defer r.Unlock()
@@ -280,14 +280,14 @@ func (r *Ars) query() error {
 	return err
 }
 
-// all functions write to the ARS / serial port through this wrapper function
-func (r *Ars) write(data []byte) (int, error) {
+// all functions write to the Yaesu rotator / serial port through this wrapper function
+func (r *Yaesu) write(data []byte) (int, error) {
 	return r.sp.Write(data)
 }
 
-// parseMsg checks the content of the received message from the ARS
+// parseMsg checks the content of the received message from the Yaesu rotator
 // and then further stores them and executes the event callback
-func (r *Ars) parseMsg(msg string) {
+func (r *Yaesu) parseMsg(msg string) {
 
 	headings := []string{}
 
@@ -310,7 +310,7 @@ func (r *Ars) parseMsg(msg string) {
 
 // verify if the data has changed. If so, notify the application through
 // the callback
-func (r *Ars) setValueAndCallEvent(ev rotator.Event, value int) {
+func (r *Yaesu) setValueAndCallEvent(ev rotator.Event, value int) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -323,8 +323,7 @@ func (r *Ars) setValueAndCallEvent(ev rotator.Event, value int) {
 		if r.azimuth != value {
 			r.azimuth = value
 			if r.eventHandler != nil {
-				// cb launched async to avoid deadlock
-				// on ars.*()
+				// cb launched async to avoid deadlock on yaesu.*()
 				go r.eventHandler(r, rotator.Azimuth, r.serialize())
 			}
 		}
@@ -336,7 +335,7 @@ func (r *Ars) setValueAndCallEvent(ev rotator.Event, value int) {
 		if r.elevation != value {
 			r.elevation = value
 			if r.eventHandler != nil {
-				// cb launched async
+				// cb launched async to avoid deadlock on yaesu.*()
 				go r.eventHandler(r, rotator.Elevation, r.serialize())
 			}
 		}
@@ -344,14 +343,14 @@ func (r *Ars) setValueAndCallEvent(ev rotator.Event, value int) {
 }
 
 // Name returns the name of the rotator
-func (r *Ars) Name() string {
+func (r *Yaesu) Name() string {
 	r.RLock()
 	defer r.Unlock()
 	return r.name
 }
 
 // Azimuth returns the current horizontal heading of the rotator in degrees
-func (r *Ars) Azimuth() int {
+func (r *Yaesu) Azimuth() int {
 	r.RLock()
 	defer r.RUnlock()
 	return r.azimuth
@@ -359,7 +358,7 @@ func (r *Ars) Azimuth() int {
 
 // AzPreset returns the horizontal heading (preset) to which the rotator
 // shall turn to
-func (r *Ars) AzPreset() int {
+func (r *Yaesu) AzPreset() int {
 	r.RLock()
 	defer r.RUnlock()
 	return r.azPreset
@@ -367,7 +366,7 @@ func (r *Ars) AzPreset() int {
 
 // HasAzimuth returns a boolean value indicating if this rotator supports
 // horizontal rotation
-func (r *Ars) HasAzimuth() bool {
+func (r *Yaesu) HasAzimuth() bool {
 	r.RLock()
 	defer r.RUnlock()
 	return r.hasAzimuth
@@ -376,7 +375,7 @@ func (r *Ars) HasAzimuth() bool {
 // SetAzimuth sets to value of the horizontal heading to which the
 // rotator shall turn to. Allowed values are 0 ... 450. Values outside
 // of this range will be clipped.
-func (r *Ars) SetAzimuth(az int) error {
+func (r *Yaesu) SetAzimuth(az int) error {
 	r.Lock()
 	defer r.Unlock()
 
@@ -402,7 +401,7 @@ func (r *Ars) SetAzimuth(az int) error {
 }
 
 // Elevation returns the current vertical elevation of the rotator in degrees
-func (r *Ars) Elevation() int {
+func (r *Yaesu) Elevation() int {
 	r.RLock()
 	defer r.RUnlock()
 	return r.elevation
@@ -410,7 +409,7 @@ func (r *Ars) Elevation() int {
 
 // ElPreset returns the vertical elevation (preset) to which the rotator
 // shall turn to
-func (r *Ars) ElPreset() int {
+func (r *Yaesu) ElPreset() int {
 	r.RLock()
 	defer r.RUnlock()
 	return r.elPreset
@@ -418,7 +417,7 @@ func (r *Ars) ElPreset() int {
 
 // HasElevation returns a boolean value indicating if this rotator supports
 // vertical rotation
-func (r *Ars) HasElevation() bool {
+func (r *Yaesu) HasElevation() bool {
 	r.RLock()
 	defer r.RUnlock()
 	return r.hasElevation
@@ -427,7 +426,7 @@ func (r *Ars) HasElevation() bool {
 // SetElevation sets to value of the vertical elevation to which the
 // rotator shall turn to. Allowed values are 0 ... 180. Values outside
 // of this range will be clipped.
-func (r *Ars) SetElevation(el int) error {
+func (r *Yaesu) SetElevation(el int) error {
 	r.RLock()
 	defer r.RUnlock()
 
@@ -454,7 +453,7 @@ func (r *Ars) SetElevation(el int) error {
 }
 
 // Stop stops all rotator movement
-func (r *Ars) Stop() error {
+func (r *Yaesu) Stop() error {
 	r.Lock()
 	defer r.Unlock()
 
@@ -469,7 +468,7 @@ func (r *Ars) Stop() error {
 }
 
 // StopAzimuth stops horizontal rotator movement
-func (r *Ars) StopAzimuth() error {
+func (r *Yaesu) StopAzimuth() error {
 	r.Lock()
 	defer r.Unlock()
 
@@ -483,7 +482,7 @@ func (r *Ars) StopAzimuth() error {
 }
 
 // StopElevation stops vertical rotator movement
-func (r *Ars) StopElevation() error {
+func (r *Yaesu) StopElevation() error {
 	r.Lock()
 	defer r.Unlock()
 
@@ -498,24 +497,25 @@ func (r *Ars) StopElevation() error {
 
 // Status returns a a rotator.Status struct with the information
 // of this rotator.
-func (r *Ars) Status() rotator.Status {
+func (r *Yaesu) Status() rotator.Status {
 	r.RLock()
 	defer r.RUnlock()
 	return r.serialize()
 }
 
-func (r *Ars) serialize() rotator.Status {
+func (r *Yaesu) serialize() rotator.Status {
 	return rotator.Status{
-		Name:      r.name,
-		Azimuth:   r.azimuth,
-		AzPreset:  r.azPreset,
-		Elevation: r.elevation,
-		ElPreset:  r.elPreset,
+		Name:           r.name,
+		Azimuth:        r.azimuth,
+		AzPreset:       r.azPreset,
+		AzimuthOverlap: r.azimuthOverlap,
+		Elevation:      r.elevation,
+		ElPreset:       r.elPreset,
 	}
 }
 
 // ExecuteRequest takes a request struct and sets the new values
-func (r *Ars) ExecuteRequest(req rotator.Request) error {
+func (r *Yaesu) ExecuteRequest(req rotator.Request) error {
 	if req.HasAzimuth {
 		if err := r.SetAzimuth(req.Azimuth); err != nil {
 			return err
@@ -550,24 +550,24 @@ func (r *Ars) ExecuteRequest(req rotator.Request) error {
 }
 
 // Info returns a rotator.Info struct with the current values of the rotator
-func (r *Ars) Info() rotator.Info {
+func (r *Yaesu) Info() rotator.Info {
 	r.RLock()
 	defer r.RUnlock()
 
 	info := rotator.Info{
-		Name:         r.name,
-		Description:  r.description,
-		HasAzimuth:   r.hasAzimuth,
-		HasElevation: r.hasElevation,
-		AzimuthMin:   r.azimuthMin,
-		AzimuthMax:   r.azimuthMax,
-		AzimuthStop:  r.azimuthStop,
-		ElevationMin: r.elevationMin,
-		ElevationMax: r.elevationMax,
-		Azimuth:      r.azimuth,
-		AzPreset:     r.azPreset,
-		Elevation:    r.elevation,
-		ElPreset:     r.elPreset,
+		Name:           r.name,
+		HasAzimuth:     r.hasAzimuth,
+		HasElevation:   r.hasElevation,
+		AzimuthMin:     r.azimuthMin,
+		AzimuthMax:     r.azimuthMax,
+		AzimuthStop:    r.azimuthStop,
+		AzimuthOverlap: r.azimuthOverlap,
+		ElevationMin:   r.elevationMin,
+		ElevationMax:   r.elevationMax,
+		Azimuth:        r.azimuth,
+		AzPreset:       r.azPreset,
+		Elevation:      r.elevation,
+		ElPreset:       r.elPreset,
 	}
 	return info
 }

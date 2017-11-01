@@ -22,11 +22,10 @@ type Hub struct {
 	closeTCPClient chan *TCPClient
 	wsClients      map[*WsClient]bool
 	closeWsClient  chan *WsClient
-	rotators       map[string]rotator.Rotator
+	rotators       map[string]rotator.Rotator //key: Rotator name
 }
 
-// NewHub returns the pointer to an initialized Hub object for a
-// given rotator.
+// NewHub returns the pointer to an initialized Hub object.
 func NewHub(rotators ...rotator.Rotator) (*Hub, error) {
 	hub := &Hub{
 		tcpClients:     make(map[*TCPClient]bool),
@@ -79,7 +78,7 @@ func (hub *Hub) addRotator(r rotator.Rotator) error {
 	if err := hub.broadcastToWsClients(ev); err != nil {
 		fmt.Println(err)
 	}
-	log.Printf("adding rotator: %s\n", r.Name())
+	log.Printf("adding rotator (%s)\n", r.Name())
 
 	return nil
 }
@@ -99,7 +98,8 @@ func (hub *Hub) RemoveRotator(r rotator.Rotator) {
 	}
 
 	delete(hub.rotators, r.Name())
-	log.Printf("removing rotator: %s\n", r.Name())
+	// TBD: Make sure rotator gets destroyed !!!!! (eg websocket closed, etc)
+	log.Printf("removing rotator (%s)\n", r.Name())
 }
 
 // HasRotator returns a bool if a given rotator is already registered.
@@ -111,7 +111,7 @@ func (hub *Hub) HasRotator(name string) bool {
 	return ok
 }
 
-// Rotators returns a list of all registered rotators.
+// Rotators returns a slice of all registered rotators.
 func (hub *Hub) Rotators() []rotator.Rotator {
 	hub.RLock()
 	defer hub.RUnlock()
@@ -124,7 +124,7 @@ func (hub *Hub) Rotators() []rotator.Rotator {
 	return rotators
 }
 
-// AddTCPClient registers a new tcp client
+// addTCPClient registers a new tcp client
 func (hub *Hub) addTCPClient(client *TCPClient) {
 	hub.Lock()
 	defer hub.Unlock()
@@ -166,7 +166,7 @@ func (hub *Hub) addWsClient(client *WsClient) {
 		delete(hub.wsClients, client)
 	}
 	hub.wsClients[client] = true
-	// TBD: Start listening on websocket
+
 	log.Printf("websocket client connected (%v)\n", client.RemoteAddr())
 	go client.listen(hub, hub.closeWsClient)
 }
@@ -194,20 +194,20 @@ func (hub *Hub) ListenTCP(host string, port int, tcpError chan<- bool) {
 	// Listen for incoming connections.
 	l, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
-		log.Printf("tcp listener error: %v", err.Error())
+		log.Printf("tcp listener error (%v)", err.Error())
+		return
 	}
 
 	// Close the listener when the application closes.
 	defer l.Close()
 
-	fmt.Printf("Listening on %s:%d for TCP connections\n", host, port)
+	log.Printf("listening on %s:%d for TCP connections\n", host, port)
 
 	for {
 		// Listen for an incoming connection.
 		conn, err := l.Accept()
 		if err != nil {
-			fmt.Println("Error accepting: ", err.Error())
-			// os.Exit(1)
+			log.Println("error accepting: ", err.Error())
 		}
 
 		c := &TCPClient{
@@ -235,7 +235,6 @@ func (hub *Hub) wsHandler(w http.ResponseWriter, r *http.Request) {
 
 	hub.RLock()
 	for _, r := range hub.rotators {
-		fmt.Println("sending info for", r.Name())
 		ev := Event{
 			Name:    AddRotator,
 			Rotator: r.Info(),
@@ -286,7 +285,7 @@ func (hub *Hub) ListenHTTP(host string, port int, wsError chan<- bool) {
 	http.HandleFunc("/ws", hub.wsHandler)
 
 	// Listen for incoming connections.
-	fmt.Printf("Listening on %s:%d for HTTP connections\n", host, port)
+	log.Printf("listening on %s:%d for HTTP connections\n", host, port)
 
 	err := http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), nil)
 	if err != nil {

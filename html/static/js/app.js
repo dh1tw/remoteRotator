@@ -10,19 +10,25 @@ var vm = new Vue({
             az_preset: 0,
             az_stop: 0,
             az_min: 0,
-            az_max: 450,
-            elevation: 0,
-            el_preset: 0,
-            has_azimuth: true,
-            has_elevation: false,
+            az_max: 360,
+            az_overlap: false,
         },
-        azEnabled: false,
-        azCanvasSize: 400,
+        selectedElRotator: {
+            name: "n/a",
+            elevation: 0,
+            el_min: 0,
+            el_max: 180,
+            el_preset: 0,
+        },
+        canvasSize: 200,
         hideConnectionMsg: false,
         resizeTimeout: null,
+        connected: false,
     },
     components: {
         'azimuth-rotator': AzimuthRotator,
+        'elevation-rotator': ElevationRotator,
+        'rotator-name': RotatorName,
     },
     created: function () {
         window.addEventListener('resize', this.getWindowSize);
@@ -31,6 +37,9 @@ var vm = new Vue({
     mounted: function () {
         this.openWebsocket();
     },
+    beforeDestroy: function () {
+        window.removeEventListener('resize', this.getWindowWidth);
+    },
     methods: {
 
         // add a rotator
@@ -38,42 +47,64 @@ var vm = new Vue({
 
             if (!(rotator.name in this.rotators)) {
                 this.$set(this.rotators, rotator.name, rotator);
-                console.log(rotator);
             }
 
             // if this is the first rotator, set the main azimuth rotator component
             if (this.selectedAzRotator.name === "n/a" && rotator.has_azimuth) {
-                this.azEnabled = true;
                 this.selectedAzRotator = rotator;
             }
+            if (this.selectedElRotator.name === "n/a" && rotator.has_elevation) {
+                this.selectedElRotator = rotator;
+            }
+            this.resizeWindow();
         },
 
         // remove a rotator
         removeRotator: function (rotator) {
 
             if (rotator.name in this.rotators) {
-                
+
                 this.$delete(this.rotators, rotator.name);
 
-                if (Object.keys(this.rotators).length > 0){
-                    if (this.selectedAzRotator.name == rotator.name){
-                        this.selectedAzRotator = this.rotators[Object.keys(this.rotators)[0]];
-                    }                
+                // check if other azimuth rotators are still available
+                if (Object.keys(this.azRotators).length > 0) {
+                    if (this.selectedAzRotator.name == rotator.name) {
+                        // pick the first one in the list
+                        var nextRot = Object.keys(this.azRotators)[0];
+                        this.selectedAzRotator = this.azRotators[nextRot];
+                    }
                 } else {
                     // no more rotators left
                     this.selectedAzRotator = {
                         name: "n/a",
                         azimuth: 0,
+                        az_min: 0,
+                        az_max: 360,
+                        az_overlap: false,
                         az_preset: 0,
                         az_stop: 0,
-                        elevation: 0,
-                        el_preset: 0,
-                        has_azimuth: true,
-                        has_elevation: false,
                     }
-                    this.azEnabled = false;
+                }
+
+                // check if other elevation rotators are still available
+                if (Object.keys(this.elRotators).length > 0) {
+                    if (this.selectedElRotator.name == rotator.name) {
+                        // pick the first one in the list
+                        var nextRot = Object.keys(this.azRotators)[0];
+                        this.selectedElRotator = this.elRotators[nextRot];
+                    }
+                } else {
+                    // no more rotators left
+                    this.selectedElRotator = {
+                        name: "n/a",
+                        elevation: 0,
+                        el_min: 0,
+                        el_max: 180,
+                        el_preset: 0,                    }
                 }
             }
+
+            this.resizeWindow();
         },
 
         // open the websocket and set an eventlister to receive updates
@@ -82,6 +113,7 @@ var vm = new Vue({
             this.ws = new ReconnectingWebSocket('ws://' + window.location.host + '/ws');
             this.ws.addEventListener('message', function (e) {
                 var eventMsg = JSON.parse(e.data);
+                // console.log(eventMsg);
 
                 if (eventMsg['name'] == 'add') {
                     this.addRotator(eventMsg['rotator']);
@@ -95,6 +127,7 @@ var vm = new Vue({
                         if (rotator.has_azimuth) {
                             this.$set(this.rotators[newHeading.name], 'azimuth', newHeading.azimuth);
                             this.$set(this.rotators[newHeading.name], 'az_preset', newHeading.az_preset);
+                            this.$set(this.rotators[newHeading.name], 'az_overlap', newHeading.az_overlap);
                         }
                         if (rotator.has_elevation) {
                             this.$set(this.rotators[newHeading.name], 'elevation', newHeading.elevation);
@@ -114,6 +147,10 @@ var vm = new Vue({
             this.ws.addEventListener('close', function () {
                 this.connected = false
                 this.hideConnectionMsg = false;
+                for (rotator in this.rotators){
+                    this.removeRotator(this.rotators[rotator]);
+                }
+                this.rotators = {}
             }.bind(this));
         },
 
@@ -124,12 +161,29 @@ var vm = new Vue({
             }
         },
 
+        // set the active elevation rotator
+        setElRotator: function (name) {
+            if (name in this.rotators) {
+                this.selectedElRotator = this.rotators[name]
+            }
+        },
+
         // send a request to the server to set azimuth
         setAzimuth: function (name, heading) {
             var msg = {
                 "name": name,
                 "has_azimuth": true,
                 "azimuth": heading,
+            }
+            var data = JSON.stringify(msg);
+            this.ws.send(data);
+        },
+        // send a request to the server to set elevation
+        setElevation: function (name, heading) {
+            var msg = {
+                "name": name,
+                "has_elevation": true,
+                "elevation": heading,
             }
             var data = JSON.stringify(msg);
             this.ws.send(data);
@@ -147,25 +201,74 @@ var vm = new Vue({
             var width = document.documentElement.clientWidth;
             var height = document.documentElement.clientHeight;
 
-            if (height < width) {
-                this.azCanvasSize = document.documentElement.clientHeight - 120;
+            // azimuth and elevation rotators available
+            console.log("width:" + width);
+            console.log("height:" + height);
+
+            // azimuth AND elevation rotator available
+            if (Object.keys(this.azRotators).length > 0 && Object.keys(this.elRotators).length > 0) {
+                if (width > height) {
+                    this.canvasSize = width * 2 / 5;
+                    if (this.canvasSize > height) {
+                        this.canvasSize = height * 4 / 5;
+                    }
+                } else {
+                    this.canvasSize = width / 2 - width/10;
+                    if (this.canvasSize < 200){
+                        this.canvasSize = 300;
+                    }
+                }
+                // only azimuth or elevation rotator available
             } else {
-                this.azCanvasSize = document.documentElement.clientWidth - 70;
+                if (width > height) {
+                    this.canvasSize = height - 120;
+                } else {
+                    this.canvasSize = width - 70;
+                }
             }
-            this.$forceUpdate();
+            console.log("canvas:" + this.canvasSize);
         },
     },
-    beforeDestroy() {
-        window.removeEventListener('resize', this.getWindowWidth);
-    },
     computed: {
-        // order the rotators alphabetically
-        sortedRotators: function () {
+        // returns an object containing all azimuth rotators
+        azRotators: function ()  {
             var rotators = this.rotators;
+            var azRotators = {};
+            Object.keys(rotators).forEach(function (key) {
+                if (rotators[key].has_azimuth) {
+                    azRotators[key] = rotators[key];
+                }
+            });
+            return azRotators;
+        },
+        // returns an object containing all elevation rotators
+        elRotators: function ()  {
+            var rotators = this.rotators;
+            var elRotators = {};
+            Object.keys(rotators).forEach(function (key) {
+                if (rotators[key].has_elevation) {
+                    elRotators[key] = rotators[key];
+                }
+            });
+            return elRotators;
+        },
 
+        // returns all azimuth rotators, ordered alphabetically
+        sortedAzRotators: function () {
+            var azRotators = this.azRotators;
             const ordered = {};
-            Object.keys(rotators).sort().forEach(function (key) {
-                ordered[key] = rotators[key];
+            Object.keys(azRotators).sort().forEach(function (key) {
+                ordered[key] = azRotators[key];
+            });
+            return ordered;
+        },
+        // returns all elevation rotators, ordered alphabetically
+        sortedElRotators: function () {
+
+            var elRotators = this.elRotators;
+            const ordered = {};
+            Object.keys(elRotators).sort().forEach(function (key) {
+                ordered[key] = elRotators[key];
             });
             return ordered;
         },

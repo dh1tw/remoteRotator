@@ -99,9 +99,7 @@ func (w *webserver) update() {
 
 	dsvrdRotators := discovery.LookupRotators()
 
-	// w.Lock()
-	// defer w.Unlock()
-	// check if rotator has to be added
+	// check if rotator(s) are not registered yet
 	for _, dr := range dsvrdRotators {
 
 		// if the rotator is new, then add it

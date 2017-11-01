@@ -21,7 +21,8 @@ has been reached.
 ## Supported Rotators
 
 - [Yaesu GS232A](http://www.yaesu.com/indexVS.cfm?cmd=DisplayProducts&ProdCatID=104&encProdID=79A89CEC477AA3B819EE02831F3FD5B8)
-- [EA4TX ARS](http://ea4tx.com/en/)
+- [EA4TX ARS (implements Yaesu GS232A)](http://ea4tx.com/en/)
+- Dummy rotator
 
 ## Supported Transportation Protocols
 
@@ -68,7 +69,6 @@ Flags:
       --azimuth-min int        metadata: minimum azimuth (in deg)
       --azimuth-stop int       metadata: mechanical azimuth stop (in deg)
   -b, --baudrate int           baudrate (default 9600)
-  -d, --description string     Description (default "Yaesu G1000 with 4el 20m Yagi@18m ASL")
       --discovery-enabled      make rotator discoverable on the network (default true)
       --elevation-max int      metadata: maximum elevation (in deg) (default 180)
       --elevation-min int      metadata: minimum elevation (in deg)
@@ -84,14 +84,14 @@ Flags:
       --tcp-enabled            enable TCP Server (default true)
   -u, --tcp-host string        Host (use '0.0.0.0' to listen on all network adapters) (default "127.0.0.1")
   -p, --tcp-port int           TCP Port (default 7373)
-  -t, --type string            Rotator type (supported: ARS (default "ARS")
+  -t, --type string            Rotator type (supported: yaesu, dummy (default "yaesu")
 
 Global Flags:
       --config string   config file (default is $HOME/.remoteRotator.yaml)
 ```
 
-So in order to launch remoteRotator on Windows with an ARS connected at COM3
-and having the server listening on the network port 5050, we would call:
+So in order to launch remoteRotator on Windows with a Yaesu rotator connected at
+COM3 and having the server listening on the network port 5050, we would call:
 
 ```bash
 $ remoteRotator server tcp -u "0.0.0.0" -p 5050 -P "COM3"
@@ -136,7 +136,7 @@ file has been found.
 
 Priority:
 
-1. Pflags (e.g. -p 4040 -t ARS)
+1. Pflags (e.g. -p 4040 -t dummy)
 2. Values from config file
 3. Default values
 

@@ -16,8 +16,8 @@ import (
 
 	"github.com/dh1tw/remoteRotator/hub"
 	"github.com/dh1tw/remoteRotator/rotator"
-	"github.com/dh1tw/remoteRotator/rotator/ars"
 	"github.com/dh1tw/remoteRotator/rotator/dummy"
+	"github.com/dh1tw/remoteRotator/rotator/yaesu"
 	// _ "net/http/pprof"
 )
 
@@ -40,14 +40,13 @@ func init() {
 	tcpServerCmd.Flags().BoolP("discovery-enabled", "", true, "make rotator discoverable on the network")
 	tcpServerCmd.Flags().StringP("portname", "P", "/dev/ttyACM0", "portname / path to the rotator (e.g. COM1)")
 	tcpServerCmd.Flags().IntP("baudrate", "b", 9600, "baudrate")
-	tcpServerCmd.Flags().StringP("type", "t", "ARS", "Rotator type (supported: ARS")
+	tcpServerCmd.Flags().StringP("type", "t", "yaesu", "Rotator type (supported: yaesu, dummy")
 	tcpServerCmd.Flags().StringP("name", "n", "myRotator", "Name tag for the rotator")
-	tcpServerCmd.Flags().StringP("description", "d", "Yaesu G1000 with 4el 20m Yagi@18m ASL", "Description")
-	tcpServerCmd.Flags().BoolP("has-azimuth", "", true, "Indicate if the rotator supports Azimuth")
-	tcpServerCmd.Flags().BoolP("has-elevation", "", false, "Indicate if the rotator supports Elevation")
+	tcpServerCmd.Flags().BoolP("has-azimuth", "", true, "rotator supports Azimuth")
+	tcpServerCmd.Flags().BoolP("has-elevation", "", false, "rotator supports Elevation")
 	tcpServerCmd.Flags().DurationP("pollingrate", "", time.Second*1, "rotator polling rate")
 	tcpServerCmd.Flags().IntP("azimuth-min", "", 0, "metadata: minimum azimuth (in deg)")
-	tcpServerCmd.Flags().IntP("azimuth-max", "", 450, "metadata: maximum azimuth (in deg)")
+	tcpServerCmd.Flags().IntP("azimuth-max", "", 360, "metadata: maximum azimuth (in deg)")
 	tcpServerCmd.Flags().IntP("azimuth-stop", "", 0, "metadata: mechanical azimuth stop (in deg)")
 	tcpServerCmd.Flags().IntP("elevation-min", "", 0, "metadata: minimum elevation (in deg)")
 	tcpServerCmd.Flags().IntP("elevation-max", "", 180, "metadata: maximum elevation (in deg)")
@@ -68,11 +67,6 @@ func tcpServer(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// check if values from config file / pflags are valid
-	// if !checkParameterValues() {
-	// 	os.Exit(-1)
-	// }
-
 	// bind the pflags to viper settings
 	viper.BindPFlag("tcp.enabled", cmd.Flags().Lookup("tcp-enabled"))
 	viper.BindPFlag("tcp.host", cmd.Flags().Lookup("tcp-host"))
@@ -85,7 +79,6 @@ func tcpServer(cmd *cobra.Command, args []string) {
 	viper.BindPFlag("rotator.baudrate", cmd.Flags().Lookup("baudrate"))
 	viper.BindPFlag("rotator.type", cmd.Flags().Lookup("type"))
 	viper.BindPFlag("rotator.name", cmd.Flags().Lookup("name"))
-	viper.BindPFlag("rotator.description", cmd.Flags().Lookup("description"))
 	viper.BindPFlag("rotator.has-azimuth", cmd.Flags().Lookup("has-azimuth"))
 	viper.BindPFlag("rotator.has-elevation", cmd.Flags().Lookup("has-elevation"))
 	viper.BindPFlag("rotator.pollingrate", cmd.Flags().Lookup("pollingrate"))
@@ -95,13 +88,66 @@ func tcpServer(cmd *cobra.Command, args []string) {
 	viper.BindPFlag("rotator.elevation-min", cmd.Flags().Lookup("elevation-min"))
 	viper.BindPFlag("rotator.elevation-max", cmd.Flags().Lookup("elevation-max"))
 
+	if len(viper.GetString("rotator.name")) == 0 {
+		log.Println("rotator name must not be empty")
+		os.Exit(1)
+	}
+
+	if viper.GetBool("rotator.has-azimuth") {
+
+		if viper.GetInt("rotator.azimuth-min") >= viper.GetInt("rotator.azimuth-max") {
+			log.Println("azimuth-min must be smaller than azimuth-max")
+			os.Exit(1)
+		}
+
+		if viper.GetInt("rotator.azimuth-max") > 360 && viper.GetInt("rotator.azimuth-min") > 360 {
+			log.Println("if azimuth-max is >360, azimuth-min must be < 360")
+			os.Exit(1)
+		}
+
+		if viper.GetInt("rotator.azimuth-min") < 0 {
+			log.Println("azimuth-min must be >= 0")
+			os.Exit(1)
+		}
+
+		if viper.GetInt("rotator.azimuth-max") > 500 {
+			log.Println("azimuth-min must be <= 500")
+			os.Exit(1)
+		}
+	}
+
+	if viper.GetBool("rotator.has-elevation") {
+
+		if viper.GetInt("rotator.elevation-min") < 0 {
+			log.Println("elevation-min must be >= 0")
+			os.Exit(1)
+		}
+
+		if viper.GetInt("rotator.elevation-max") > 180 {
+			log.Println("elevation-min must be <= 180")
+			os.Exit(1)
+		}
+	}
+
+	if viper.GetBool("discovery.enabled") && !viper.GetBool("http.enabled") {
+		log.Println("for discovery, HTTP must be enabled")
+		os.Exit(1)
+	}
+
+	// check if values from config file / pflags are valid
+	// if !checkParameterValues() {
+	// --> tcp & http host must be valid hostnames -> catch panic & exit gracefully
+
+	// 	os.Exit(-1)
+	// }
+
 	// go func() {
 	// 	log.Println(http.ListenAndServe("0.0.0.0:6060", http.DefaultServeMux))
 	// }()
 
 	bcast := make(chan rotator.Status, 10)
 
-	var arsEventHandler = func(r rotator.Rotator, ev rotator.Event, value ...interface{}) {
+	var yaesuEventHandler = func(r rotator.Rotator, ev rotator.Event, value ...interface{}) {
 		// fmt.Println(ev, value)
 		switch ev {
 		case rotator.Azimuth, rotator.Elevation:
@@ -124,35 +170,46 @@ func tcpServer(cmd *cobra.Command, args []string) {
 
 	switch strings.ToUpper(viper.GetString("rotator.type")) {
 
-	case "ARS":
-		evHandler := ars.EventHandler(arsEventHandler)
-		name := ars.Name(viper.GetString("rotator.name"))
-		interval := ars.UpdateInterval(viper.GetDuration("rotator.pollingrate"))
-		spPortName := ars.Portname(viper.GetString("rotator.portname"))
-		baudrate := ars.Baudrate(viper.GetInt("rotator.baudrate"))
-		hasAzimuth := ars.HasAzimuth(viper.GetBool("rotator.has-azimuth"))
-		hasElevation := ars.HasElevation(viper.GetBool("rotator.has-elevation"))
+	case "YAESU":
+		evHandler := yaesu.EventHandler(yaesuEventHandler)
+		name := yaesu.Name(viper.GetString("rotator.name"))
+		interval := yaesu.UpdateInterval(viper.GetDuration("rotator.pollingrate"))
+		spPortName := yaesu.Portname(viper.GetString("rotator.portname"))
+		baudrate := yaesu.Baudrate(viper.GetInt("rotator.baudrate"))
+		hasAzimuth := yaesu.HasAzimuth(viper.GetBool("rotator.has-azimuth"))
+		hasElevation := yaesu.HasElevation(viper.GetBool("rotator.has-elevation"))
+		azMin := yaesu.AzimuthMin(viper.GetInt("rotator.azimuth-min"))
+		azMax := yaesu.AzimuthMax(viper.GetInt("rotator.azimuth-max"))
+		elMin := yaesu.ElevationMin(viper.GetInt("rotator.elevation-min"))
+		elMax := yaesu.ElevationMax(viper.GetInt("rotator.elevation-max"))
+		azStop := yaesu.AzimuthStop(viper.GetInt("rotator.azimuth-stop"))
 
-		ars, err := ars.NewArs(name, interval, evHandler,
-			spPortName, baudrate, hasAzimuth, hasElevation)
+		yaesu, err := yaesu.NewYaesu(name, interval, evHandler,
+			spPortName, baudrate, hasAzimuth, hasElevation, azMin, azMax, elMin,
+			elMax, azStop)
 		if err != nil {
-			fmt.Println("unable to initialize ARS:", err)
+			fmt.Println("unable to initialize YAESU rotator:", err)
 			os.Exit(1)
 		}
-		h, err = hub.NewHub(ars)
+		h, err = hub.NewHub(yaesu)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		ars.Start(rotatorError, rotatorShutdown)
+		yaesu.Start(rotatorError, rotatorShutdown)
 
 	case "DUMMY":
-		evHandler := dummy.EventHandler(arsEventHandler)
+		evHandler := dummy.EventHandler(yaesuEventHandler)
 		name := dummy.Name(viper.GetString("rotator.name"))
 		hasAzimuth := dummy.HasAzimuth(viper.GetBool("rotator.has-azimuth"))
 		hasElevation := dummy.HasElevation(viper.GetBool("rotator.has-elevation"))
+		azMin := dummy.AzimuthMin(viper.GetInt("rotator.azimuth-min"))
+		azMax := dummy.AzimuthMax(viper.GetInt("rotator.azimuth-max"))
+		elMin := dummy.ElevationMin(viper.GetInt("rotator.elevation-min"))
+		elMax := dummy.ElevationMax(viper.GetInt("rotator.elevation-max"))
+		azStop := dummy.AzimuthStop(viper.GetInt("rotator.azimuth-stop"))
 
-		dummyRotator, err := dummy.NewDummyRotator(name, evHandler, hasAzimuth, hasElevation)
+		dummyRotator, err := dummy.NewDummyRotator(name, evHandler, hasAzimuth, hasElevation, azMin, azMax, azStop, elMin, elMax)
 		if err != nil {
 			fmt.Println("unable to initialize Dummy rotator:", err)
 			os.Exit(1)
@@ -166,7 +223,7 @@ func tcpServer(cmd *cobra.Command, args []string) {
 		dummyRotator.Start(rotatorShutdown)
 
 	default:
-		fmt.Printf("unknown rotator type %v\n", viper.GetString("rotator.type"))
+		log.Printf("unknown rotator type (%v)\n", viper.GetString("rotator.type"))
 		os.Exit(1)
 	}
 
@@ -185,36 +242,24 @@ func tcpServer(cmd *cobra.Command, args []string) {
 	}
 
 	// shutdownWg := sync.WaitGroup{}
-	mDNSServer := &mdns.Server{}
 	// start mDNS server
+	mDNSShutdown := make(chan struct{})
+
 	if viper.GetBool("discovery.enabled") {
+		go func() {
+			mDNSService, err := mdns.NewMDNSService(viper.GetString("rotator.name"),
+				"rotators.shackbus", "", "", viper.GetInt("http.port"), nil, nil)
 
-		i := rotator.Info{
-			Name:         viper.GetString("rotator.name"),
-			Description:  viper.GetString("rotator.description"),
-			HasAzimuth:   viper.GetBool("rotator.has-azimuth"),
-			HasElevation: viper.GetBool("rotator.has-elevation"),
-			AzimuthMin:   viper.GetInt("rotator.azimuth-min"),
-			AzimuthMax:   viper.GetInt("rotator.azimuth-max"),
-			AzimuthStop:  viper.GetInt("rotator.azimuth-stop"),
-			ElevationMin: viper.GetInt("rotator.elevation-min"),
-			ElevationMax: viper.GetInt("rotator.elevation-max"),
-		}
-		info, err := encodeInfo(i)
-		if err != nil {
-			fmt.Printf("unable to marshal rotator description: %s\n", err)
-			return
-		}
+			if err != nil {
+				log.Printf("unable to start mDNS discovery service: %s\n", err)
+				log.Println("mDNS discovery is disabled")
+				return
+			}
 
-		mDNSService, err := mdns.NewMDNSService(viper.GetString("rotator.name"),
-			"rotators.shackbus", "", "", viper.GetInt("http.port"), nil, []string{info})
-
-		if err != nil {
-			fmt.Printf("unable to start mDNS discovery service: %v", err)
-			return
-		}
-		mDNSServer, _ = mdns.NewServer(&mdns.Config{Zone: mDNSService})
-		defer mDNSServer.Shutdown()
+			mDNSServer, _ := mdns.NewServer(&mdns.Config{Zone: mDNSService})
+			defer mDNSServer.Shutdown()
+			<-mDNSShutdown
+		}()
 	}
 
 	// Channel to handle OS signals
@@ -228,6 +273,7 @@ func tcpServer(cmd *cobra.Command, args []string) {
 		case sig := <-osSignals:
 			if sig == os.Interrupt {
 				close(rotatorShutdown)
+				close(mDNSShutdown)
 				return
 			}
 		case msg := <-bcast:

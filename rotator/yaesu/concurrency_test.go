@@ -1,4 +1,4 @@
-package ars
+package yaesu
 
 import (
 	"fmt"
@@ -14,12 +14,12 @@ import (
 // randPort mocks the serial port for this test.
 // randPort implements the ReadWriteCloser Interface
 type randPort struct {
-	bytesSent uint64    // atomic counter for bytes sent to ARS via serial port
-	bytesRcvd uint64    // atomic counter for bytes recevied from ARS via serial port
+	bytesSent uint64    // atomic counter for bytes sent to Yaesu rotator via serial port
+	bytesRcvd uint64    // atomic counter for bytes recevied from Yaesu rotator via serial port
 	ts        time.Time // timestamp to limit calls
 }
 
-// simulate traffic sent from ARS to our application
+// simulate traffic sent from Yaesu rotator to our application
 // every 50ms
 func (p *randPort) Read(b []byte) (int, error) {
 	if time.Since(p.ts) > time.Millisecond*50 {
@@ -58,14 +58,14 @@ type apiCallCounter struct {
 }
 
 // This test will spin up 1000 go routines and call randomly all available
-// Methods of the Ars object. The intention of this test is to detect any
+// Methods of the Yaesu object. The intention of this test is to detect any
 // race conditions which could happen due to the concurrent access.
 // A summary of the API calls and transferred bytes (rx/tx) after a successful
 // pass.
-func TestArsMassiveConcurrentCalls(t *testing.T) {
+func TestYaesuMassiveConcurrentCalls(t *testing.T) {
 	dp := &randPort{}
 
-	ars := &Ars{
+	yaesu := &Yaesu{
 		hasAzimuth:      true,
 		sp:              dp,
 		pollingInterval: time.Second * 2,
@@ -76,19 +76,19 @@ func TestArsMassiveConcurrentCalls(t *testing.T) {
 	d := time.Second * 5
 	wg := &sync.WaitGroup{}
 
-	arsError := make(chan struct{})
+	yaesuError := make(chan struct{})
 	shutdown := make(chan struct{})
 
 	calls := &apiCallCounter{}
 
-	go ars.Start(arsError, shutdown)
+	go yaesu.Start(yaesuError, shutdown)
 	for i := 0; i < 1000; i++ {
-		go randomAccess(ars, d, calls, wg, t)
+		go randomAccess(yaesu, d, calls, wg, t)
 		wg.Add(1)
 	}
 
 	select {
-	case <-arsError:
+	case <-yaesuError:
 		t.Errorf("unexpected error while reading from serial port")
 	default:
 	}
@@ -97,25 +97,25 @@ func TestArsMassiveConcurrentCalls(t *testing.T) {
 	time.Sleep(time.Second * 3)
 	fmt.Println("Concurrent stress test summary:")
 	fmt.Println(strings.Repeat("=", 30))
-	fmt.Printf("bytes sent to (fake ARS):       %d\n", atomic.LoadUint64(&dp.bytesSent))
-	fmt.Printf("bytes received from (fake ARS): %d\n", atomic.LoadUint64(&dp.bytesRcvd))
-	fmt.Printf("ars.Serialize called:     %d times\n", atomic.LoadUint64(&calls.serialize))
-	fmt.Printf("ars.Azimuth called:       %d times\n", atomic.LoadUint64(&calls.azimuth))
-	fmt.Printf("ars.Elevation called:     %d times\n", atomic.LoadUint64(&calls.elevation))
-	fmt.Printf("ars.AzPreset called:      %d times\n", atomic.LoadUint64(&calls.azPreset))
-	fmt.Printf("ars.HasAzimuth called:    %d times\n", atomic.LoadUint64(&calls.hasAzimuth))
-	fmt.Printf("ars.HasElevation called:  %d times\n", atomic.LoadUint64(&calls.hasElevation))
-	fmt.Printf("ars.ElPreset called:      %d times\n", atomic.LoadUint64(&calls.elPreset))
-	fmt.Printf("ars.SetAzimuth called:    %d times\n", atomic.LoadUint64(&calls.setAzimuth))
-	fmt.Printf("ars.SetElevation called:  %d times\n", atomic.LoadUint64(&calls.setElevation))
-	fmt.Printf("ars.Stop called:          %d times\n", atomic.LoadUint64(&calls.stop))
-	fmt.Printf("ars.StopAzimuth called:   %d times\n", atomic.LoadUint64(&calls.stopAzimuth))
-	fmt.Printf("ars.StopElevation called: %d times\n", atomic.LoadUint64(&calls.stopElevation))
+	fmt.Printf("bytes sent to (fake rotator):       %d\n", atomic.LoadUint64(&dp.bytesSent))
+	fmt.Printf("bytes received from (fake rotator): %d\n", atomic.LoadUint64(&dp.bytesRcvd))
+	fmt.Printf("yaesu.Serialize called:             %d times\n", atomic.LoadUint64(&calls.serialize))
+	fmt.Printf("yaesu.Azimuth called:               %d times\n", atomic.LoadUint64(&calls.azimuth))
+	fmt.Printf("yaesu.Elevation called:             %d times\n", atomic.LoadUint64(&calls.elevation))
+	fmt.Printf("yaesu.AzPreset called:              %d times\n", atomic.LoadUint64(&calls.azPreset))
+	fmt.Printf("yaesu.HasAzimuth called:            %d times\n", atomic.LoadUint64(&calls.hasAzimuth))
+	fmt.Printf("yaesu.HasElevation called:          %d times\n", atomic.LoadUint64(&calls.hasElevation))
+	fmt.Printf("yaesu.ElPreset called:              %d times\n", atomic.LoadUint64(&calls.elPreset))
+	fmt.Printf("yaesu.SetAzimuth called:            %d times\n", atomic.LoadUint64(&calls.setAzimuth))
+	fmt.Printf("yaesu.SetElevation called:          %d times\n", atomic.LoadUint64(&calls.setElevation))
+	fmt.Printf("yaesu.Stop called:                  %d times\n", atomic.LoadUint64(&calls.stop))
+	fmt.Printf("yaesu.StopAzimuth called:           %d times\n", atomic.LoadUint64(&calls.stopAzimuth))
+	fmt.Printf("yaesu.StopElevation called:         %d times\n", atomic.LoadUint64(&calls.stopElevation))
 	// fmt.Println("write buffer:", dp.sendBuf.Len())
 }
 
 // just randomly call any of the API methods
-func randomAccess(r *Ars, timeout time.Duration, c *apiCallCounter,
+func randomAccess(r *Yaesu, timeout time.Duration, c *apiCallCounter,
 	wg *sync.WaitGroup, t *testing.T) {
 	defer wg.Done()
 

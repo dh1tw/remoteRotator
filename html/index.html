@@ -14,27 +14,50 @@
 
 <body>
   <div id="app">
-    <div class="main-rotator">
+    <div class="main-rotator" v-if="Object.keys(sortedAzRotators).length > 0">
       <div id="azimuth-rotator">
-        <h3 class="name">{{selectedAzRotator.name}}</h3>
+        <rotator-name :name="selectedAzRotator.name" :is-azimuth="true" :width="canvasSize"></rotator-name>
+        <azimuth-rotator v-on:set-azimuth="setAzimuth" :name="selectedAzRotator.name" :heading="selectedAzRotator.azimuth" :preset="selectedAzRotator.az_preset"
+          :overlap="selectedAzRotator.az_overlap" :min="selectedAzRotator.az_min" :max="selectedAzRotator.az_max" :stop="selectedAzRotator.az_stop"
+          :canvas-size="canvasSize">
+        </azimuth-rotator>
+        <div class="mini-rotators" v-if="Object.keys(sortedAzRotators).length > 1">
+          <ul>
+            <li v-for="rotator in sortedAzRotators">
+              <div class="mini-rotator">
+                <button type='button' class='btn btn-primary btn-sm mini-rotator-btn' v-bind:class="{active : selectedAzRotator.name == rotator.name }"
+                  v-on:click="setAzRotator(rotator.name) ">{{rotator.name}}</button>
+                <div class='mini-rotator-canvas'>
+                  <azimuth-rotator :name="rotator.name" :heading="rotator.azimuth" :preset="rotator.az_preset" v-on:set-azimuth="setAzimuth"
+                    :overlap="rotator.az_overlap" :min="rotator.az_min" :max="rotator.az_max" :stop="rotator.az_stop" :canvas-size=100></azimuth-rotator>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </div>
       </div>
-      <azimuth-rotator v-on:set-azimuth="setAzimuth" :name="selectedAzRotator.name" :heading="selectedAzRotator.azimuth" :preset="selectedAzRotator.az_preset"
-        :enabled="azEnabled" :canvas-size="azCanvasSize">
-      </azimuth-rotator>
     </div>
-    <div id="mini-rotators" v-if="Object.keys(rotators).length > 1">
-      <ul>
-        <li v-for="rotator in sortedRotators">
-          <div class="mini-rotator">
-            <button type='button' class='btn btn-primary btn-sm mini-rotator-btn' v-bind:class="{active : selectedAzRotator.name == rotator.name }"
-              v-on:click="setAzRotator(rotator.name) ">{{rotator.name}}</button>
-            <div class='mini-rotator-canvas'>
-              <azimuth-rotator :name="rotator.name" :heading="rotator.azimuth" :preset="rotator.az_preset" :enabled=true :show-heading=false
-              v-on:set-azimuth="setAzimuth" :canvas-size=100></azimuth-rotator>
-            </div>
-          </div>
-        </li>
-      </ul>
+    <div class="main-rotator" v-if="Object.keys(sortedElRotators).length > 0">
+      <div id="elevation-rotator">
+        <rotator-name :name="selectedElRotator.name" :width="canvasSize"></rotator-name>
+        <elevation-rotator v-on:set-elevation="setElevation" :name="selectedElRotator.name" :heading="selectedElRotator.elevation"
+          :preset="selectedElRotator.el_preset" :min="selectedElRotator.el_min" :max="selectedElRotator.el_max" :canvas-size="canvasSize">
+        </elevation-rotator>
+        <div class="mini-rotators" v-if="Object.keys(sortedElRotators).length > 1">
+          <ul>
+            <li v-for="rotator in sortedElRotators">
+              <div class="mini-rotator">
+                <button type='button' class='btn btn-primary btn-sm mini-rotator-btn' v-bind:class="{active : selectedElRotator.name == rotator.name }"
+                  v-on:click="setElRotator(rotator.name) ">{{rotator.name}}</button>
+                <div class='mini-rotator-canvas'>
+                  <elevation-rotator :name="rotator.name" :heading="rotator.elevation" :preset="rotator.el_preset" v-on:set-elevation="setElevation"
+                    :min="rotator.el_min" :max="rotator.el_max" :canvas-size=100></elevation-rotator>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
     </div>
     <div id="connection">
       <p id="connected" class="bg-success" v-bind:class="{'hidden': hideConnectionMsg}" v-if="connected">
@@ -47,7 +70,9 @@
   </div>
   <script src="/static/js/vue.js"></script>
   <script src="/static/js/vue-resource-1.3.4.min.js"></script>
+  <script src="/static/js/components/rotator-name.js"></script>
   <script src="/static/js/components/azimuth-rotator.js"></script>
+  <script src="/static/js/components/elevation-rotator.js"></script>
   <script src="/static/js/jquery-2.2.3.min.js"></script>
   <script src="/static/js/bootstrap.min.js"></script>
   <script src="/static/js/reconnecting-websocket.js"></script>

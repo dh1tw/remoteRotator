@@ -19,23 +19,23 @@ import (
 // with the real rotator through a websocket.
 type Proxy struct {
 	sync.RWMutex
-	host         string
-	port         int
-	conn         *websocket.Conn
-	eventHandler func(rotator.Rotator, rotator.Event, ...interface{})
-	name         string
-	description  string
-	azimuthMin   int
-	azimuthMax   int
-	azimuthStop  int
-	elevationMin int
-	elevationMax int
-	hasAzimuth   bool
-	hasElevation bool
-	azimuth      int
-	azPreset     int
-	elevation    int
-	elPreset     int
+	host           string
+	port           int
+	conn           *websocket.Conn
+	eventHandler   func(rotator.Rotator, rotator.Event, ...interface{})
+	name           string
+	azimuthMin     int
+	azimuthMax     int
+	azimuthStop    int
+	azimuthOverlap bool
+	elevationMin   int
+	elevationMax   int
+	hasAzimuth     bool
+	hasElevation   bool
+	azimuth        int
+	azPreset       int
+	elevation      int
+	elPreset       int
 }
 
 // Host is a functional option to set IP / dns name of the remote Rotators host.
@@ -64,8 +64,7 @@ func EventHandler(h func(rotator.Rotator, rotator.Event, ...interface{})) func(*
 func New(done chan struct{}, opts ...func(*Proxy)) (*Proxy, error) {
 
 	r := &Proxy{
-		name:        "rotatorProxy",
-		description: "proxy representation of a rotator",
+		name: "rotatorProxy",
 	}
 
 	for _, opt := range opts {
@@ -160,7 +159,6 @@ func (r *Proxy) getInfo() error {
 		return fmt.Errorf("expected information of 1 rotator, but got %d", len(infos))
 	}
 
-	r.description = infos[0].Description
 	r.name = infos[0].Name
 	r.hasAzimuth = infos[0].HasAzimuth
 	r.hasElevation = infos[0].HasElevation
@@ -169,6 +167,10 @@ func (r *Proxy) getInfo() error {
 	r.azimuthStop = infos[0].AzimuthStop
 	r.elevationMin = infos[0].ElevationMin
 	r.elevationMax = infos[0].ElevationMax
+	r.azimuth = infos[0].Azimuth
+	r.azPreset = infos[0].AzPreset
+	r.elevation = infos[0].Elevation
+	r.elPreset = infos[0].ElPreset
 
 	return nil
 }
@@ -266,11 +268,12 @@ func (r *Proxy) Status() rotator.Status {
 	defer r.RUnlock()
 
 	return rotator.Status{
-		Name:      r.name,
-		Azimuth:   r.azimuth,
-		AzPreset:  r.azPreset,
-		Elevation: r.elevation,
-		ElPreset:  r.elPreset,
+		Name:           r.name,
+		Azimuth:        r.azimuth,
+		AzPreset:       r.azPreset,
+		AzimuthOverlap: r.azimuthOverlap,
+		Elevation:      r.elevation,
+		ElPreset:       r.elPreset,
 	}
 }
 
@@ -283,18 +286,18 @@ func (r *Proxy) Info() rotator.Info {
 	defer r.RUnlock()
 
 	return rotator.Info{
-		Name:         r.name,
-		Description:  r.description,
-		HasAzimuth:   r.hasAzimuth,
-		HasElevation: r.hasElevation,
-		AzimuthMin:   r.azimuthMin,
-		AzimuthMax:   r.azimuthMax,
-		AzimuthStop:  r.azimuthStop,
-		ElevationMin: r.elevationMin,
-		ElevationMax: r.elevationMax,
-		Azimuth:      r.azimuth,
-		AzPreset:     r.azPreset,
-		Elevation:    r.elevation,
-		ElPreset:     r.elPreset,
+		Name:           r.name,
+		HasAzimuth:     r.hasAzimuth,
+		HasElevation:   r.hasElevation,
+		AzimuthMin:     r.azimuthMin,
+		AzimuthMax:     r.azimuthMax,
+		AzimuthStop:    r.azimuthStop,
+		AzimuthOverlap: r.azimuthOverlap,
+		ElevationMin:   r.elevationMin,
+		ElevationMax:   r.elevationMax,
+		Azimuth:        r.azimuth,
+		AzPreset:       r.azPreset,
+		Elevation:      r.elevation,
+		ElPreset:       r.elPreset,
 	}
 }

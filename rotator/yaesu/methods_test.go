@@ -1,4 +1,4 @@
-package ars
+package yaesu
 
 import (
 	"bytes"
@@ -34,41 +34,41 @@ func (p *dummyPort) Close() error {
 }
 
 func TestHasAzimuth(t *testing.T) {
-	ars := Ars{
+	yaesu := Yaesu{
 		hasAzimuth: true,
 	}
 
-	if ars.HasAzimuth() != true {
+	if yaesu.HasAzimuth() != true {
 		t.Error("should be true")
 	}
 }
 
 func TestHasElevation(t *testing.T) {
-	ars := Ars{
+	yaesu := Yaesu{
 		hasElevation: true,
 	}
 
-	if ars.HasElevation() != true {
+	if yaesu.HasElevation() != true {
 		t.Error("should be true")
 	}
 }
 
 func TestElevation(t *testing.T) {
-	ars := Ars{
+	yaesu := Yaesu{
 		elevation: 150,
 	}
 
-	if ars.Elevation() != 150 {
+	if yaesu.Elevation() != 150 {
 		t.Error("should return 150")
 	}
 }
 
 func TestAzimuth(t *testing.T) {
-	ars := Ars{
+	yaesu := Yaesu{
 		azimuth: 340,
 	}
 
-	if ars.Azimuth() != 340 {
+	if yaesu.Azimuth() != 340 {
 		t.Error("should return 340")
 	}
 }
@@ -94,13 +94,13 @@ func TestSetAzimuth(t *testing.T) {
 			rxBuf:   &bytes.Buffer{},
 		}
 
-		ars := Ars{
+		yaesu := Yaesu{
 			hasAzimuth: true,
 			sp:         &dp,
 		}
 
 		t.Run(tc.name, func(t *testing.T) {
-			err := ars.SetAzimuth(tc.value)
+			err := yaesu.SetAzimuth(tc.value)
 			if err != nil {
 				t.Fatalf("unable to set azimuth to %v; got error: %q", tc.name, err)
 			}
@@ -112,8 +112,8 @@ func TestSetAzimuth(t *testing.T) {
 					replaceLineBreaks(res),
 					replaceLineBreaks(res))
 			}
-			if ars.AzPreset() != tc.expValue {
-				t.Fatalf("expecting azimuth preset %v, but got %v", ars.AzPreset(), tc.expValue)
+			if yaesu.AzPreset() != tc.expValue {
+				t.Fatalf("expecting azimuth preset %v, but got %v", yaesu.AzPreset(), tc.expValue)
 			}
 		})
 	}
@@ -125,19 +125,19 @@ func TestSetAzimuthButNotEnabled(t *testing.T) {
 		rxBuf:   &bytes.Buffer{},
 	}
 
-	ars := Ars{
+	yaesu := Yaesu{
 		hasAzimuth: false,
 		sp:         &dp,
 	}
 
 	v := 200
 
-	err := ars.SetAzimuth(v)
+	err := yaesu.SetAzimuth(v)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if ars.Azimuth() == v {
+	if yaesu.Azimuth() == v {
 		t.Fatal("azimuth must not be set if not enabled")
 	}
 }
@@ -163,13 +163,13 @@ func TestSetElevation(t *testing.T) {
 			rxBuf:   &bytes.Buffer{},
 		}
 
-		ars := Ars{
+		yaesu := Yaesu{
 			hasElevation: true,
 			sp:           &dp,
 		}
 
 		t.Run(tc.name, func(t *testing.T) {
-			err := ars.SetElevation(tc.value)
+			err := yaesu.SetElevation(tc.value)
 			if err != nil {
 				t.Fatalf("unable to set elevation to %v; got error: %q", tc.name, err)
 			}
@@ -181,8 +181,8 @@ func TestSetElevation(t *testing.T) {
 					replaceLineBreaks(res),
 					replaceLineBreaks(res))
 			}
-			if ars.ElPreset() != tc.expValue {
-				t.Fatalf("expecting elevation preset %v, but got %v", ars.ElPreset(), tc.expValue)
+			if yaesu.ElPreset() != tc.expValue {
+				t.Fatalf("expecting elevation preset %v, but got %v", yaesu.ElPreset(), tc.expValue)
 			}
 		})
 	}
@@ -194,19 +194,19 @@ func TestSetElevationButNotEnabled(t *testing.T) {
 		rxBuf:   &bytes.Buffer{},
 	}
 
-	ars := Ars{
+	yaesu := Yaesu{
 		hasElevation: false,
 		sp:           &dp,
 	}
 
 	v := 95
 
-	err := ars.SetElevation(v)
+	err := yaesu.SetElevation(v)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if ars.Elevation() == v {
+	if yaesu.Elevation() == v {
 		t.Fatal("elevation must not be set if not enabled")
 	}
 }
@@ -232,7 +232,7 @@ func TestRotatorStop(t *testing.T) {
 				rxBuf:   &bytes.Buffer{},
 			}
 
-			ars := Ars{
+			yaesu := Yaesu{
 				azimuth:   tc.value,
 				azPreset:  tc.preset,
 				elevation: tc.value,
@@ -241,7 +241,7 @@ func TestRotatorStop(t *testing.T) {
 			}
 			switch tc.stopFunc {
 			case "azimuth":
-				err := ars.StopAzimuth()
+				err := yaesu.StopAzimuth()
 				if err != nil {
 					t.Fatalf("unable to %v", tc.name)
 				}
@@ -253,11 +253,11 @@ func TestRotatorStop(t *testing.T) {
 						exp, exp, send, send)
 				}
 
-				if ars.Azimuth() != ars.AzPreset() {
+				if yaesu.Azimuth() != yaesu.AzPreset() {
 					t.Fatalf("expected azimuth and azPreset to be equal, got: %d, %d", tc.value, tc.preset)
 				}
 			case "elevation":
-				err := ars.StopElevation()
+				err := yaesu.StopElevation()
 				if err != nil {
 					t.Fatalf("unable to %v", tc.name)
 				}
@@ -269,11 +269,11 @@ func TestRotatorStop(t *testing.T) {
 						exp, exp, send, send)
 				}
 
-				if ars.Elevation() != ars.ElPreset() {
+				if yaesu.Elevation() != yaesu.ElPreset() {
 					t.Fatalf("expected elevation and elPreset to be equal, got: %d, %d", tc.value, tc.preset)
 				}
 			case "both":
-				if err := ars.Stop(); err != nil {
+				if err := yaesu.Stop(); err != nil {
 					t.Fatal(err)
 				}
 
@@ -284,10 +284,10 @@ func TestRotatorStop(t *testing.T) {
 						exp, exp, send, send)
 				}
 
-				if ars.Azimuth() != ars.AzPreset() {
+				if yaesu.Azimuth() != yaesu.AzPreset() {
 					t.Fatalf("expected azimuth and azPreset to be equal, got: %d, %d", tc.value, tc.preset)
 				}
-				if ars.Elevation() != ars.ElPreset() {
+				if yaesu.Elevation() != yaesu.ElPreset() {
 					t.Fatalf("expected elevation and elPreset to be equal, got: %d, %d", tc.value, tc.preset)
 				}
 			}
@@ -328,11 +328,11 @@ func TestParseMsg(t *testing.T) {
 			if err != nil {
 				t.Fatalf(err.Error())
 			}
-			ars := &Ars{
+			yaesu := &Yaesu{
 				eventHandler:   tc.evHandler,
 				headingPattern: headingPattern,
 			}
-			ars.parseMsg(tc.input)
+			yaesu.parseMsg(tc.input)
 		})
 	}
 }
@@ -369,22 +369,22 @@ func TestSetValueAndCallEvent(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 
-			ars := &Ars{
+			yaesu := &Yaesu{
 				eventHandler: tc.evHandler,
 			}
-			ars.setValueAndCallEvent(tc.event, tc.value)
+			yaesu.setValueAndCallEvent(tc.event, tc.value)
 
 			if tc.event == rotator.Azimuth {
-				if ars.Azimuth() != tc.value {
+				if yaesu.Azimuth() != tc.value {
 					t.Fatalf("expected %v value %d, but got %d",
-						tc.name, tc.value, ars.Azimuth())
+						tc.name, tc.value, yaesu.Azimuth())
 				}
 			}
 
 			if tc.event == rotator.Elevation {
-				if ars.Elevation() != tc.value {
+				if yaesu.Elevation() != tc.value {
 					t.Fatalf("expected %v value %d, but got %d",
-						tc.name, tc.value, ars.Azimuth())
+						tc.name, tc.value, yaesu.Azimuth())
 				}
 			}
 		})
@@ -397,11 +397,11 @@ func TestQuery(t *testing.T) {
 		rxBuf:   &bytes.Buffer{},
 	}
 
-	ars := &Ars{
+	yaesu := &Yaesu{
 		sp: dp,
 	}
 
-	if err := ars.query(); err != nil {
+	if err := yaesu.query(); err != nil {
 		t.Fatalf("unable to send query; %v", err)
 	}
 
@@ -420,14 +420,14 @@ func TestRead(t *testing.T) {
 		rxBuf:   &bytes.Buffer{},
 	}
 
-	ars := &Ars{
+	yaesu := &Yaesu{
 		sp: dp,
 	}
 
 	expValue := "+0300+0150\r\n"
 	dp.rxBuf.WriteString(expValue)
 
-	res, err := ars.read()
+	res, err := yaesu.read()
 	if err != nil {
 		t.Fatalf("read error: %v", err)
 	}
@@ -445,11 +445,11 @@ func replaceLineBreaks(input []byte) []byte {
 	return bytes.Replace(s, []byte("\r"), []byte("\\r"), -1)
 }
 
-func TestNewArsPortNotExist(t *testing.T) {
+func TestNewYaesuPortNotExist(t *testing.T) {
 
 	tt := []struct {
 		name     string
-		portName func(*Ars)
+		portName func(*Yaesu)
 		expError string
 	}{
 		{"port does not exist", Portname("/dev/ttyXXXXX"), "open /dev/ttyXXXXX: no such file or directory"},
@@ -458,7 +458,7 @@ func TestNewArsPortNotExist(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := NewArs(tc.portName)
+			_, err := NewYaesu(tc.portName)
 			if err.Error() != tc.expError {
 				t.Fatalf("expected error '%s', got '%s'", tc.expError, err.Error())
 			}
