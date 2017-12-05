@@ -6,13 +6,12 @@
 [![Coverage Status](https://coveralls.io/repos/github/dh1tw/remoteRotator/badge.svg?branch=master)](https://coveralls.io/github/dh1tw/remoteRotator?branch=master)
 [![Downloads](https://img.shields.io/github/downloads/dh1tw/remoteRotator/total.svg?maxAge=1800)](https://github.com/dh1tw/remoteRotator/releases)
 
-remoteRotator is a cross platform application which makes your antenna rotators
-available on the network. remoteRotator implements a statemachine which will
-query in a defineable interval the heading (azimuth and/or elevation) of the 
-rotator. Updates are sent to all connected clients which can also execute 
-commands at any time.
+remoteRotator is a cross platform application which makes your azimuth / elevation
+antenna rotators available on the network and accessible through a web interface.
 
 remoteRotator is written in the programing language [Go](https://golang.org).
+
+![Animated GIF showing the web interface of remoteRotator](http://www.giphy.com/gifs/3oxHQKD4XOH3t3lCtW "remoteRotator WebUI")
 
 **ADVICE**: This project is **under development**. The parameters and the ICD
 are still **not stable** and subject to change until the first major version
@@ -43,7 +42,8 @@ is just a single executable.
 
 ## Dependencies
 
-remoteRotator does not have any external dependencies.
+remoteRotator only depends on a few go libraries which are needed at compile
+time. There are no runtime dependencies.
 
 ## Getting started
 
@@ -104,22 +104,64 @@ Listening on 0.0.0.0:7070 for HTTP connections
 
 ```
 
+## Connecting via TCP / Telnet
+
+If you have an application (e.g. [arsvcom](https://ea4tx.com/en/arsvcom/) or
+[pstrotator](http://www.qsl.net/yo3dmu/index_Page346.htm)) which can talk to
+a Yaesu compatible rotator, you can point that application to the selected
+TCP port.
+
+You can also connect directly via telnet:
+
+```
+$ telnet localhost 5050
+Trying ::1...
+Connected to localhost.
+Escape character is '^]'.
+
+?>C
++0303
+C2
++0303+0000
+M310
++0303+0000
++0304+0000
++0305+0000
++0306+0000
++0307+0000
++0307+0000
++0308+0000
++0309+0000
++0310+0000
+```
+
 ## Web Interface
 
+![Alt text](https://i.imgur.com/NcWHpYs.png "remoteRotator WebUI")
 
-![Alt text](https://i.imgur.com/X8zJwQO.png "remoteRotator WebUI")
-
-Appart of connecting to the rotator through a TCP socket, you can also
-access the rotator through a web Interface. You can specify the host and port
-in the settings above, or deactivate the built-in webserver if you don't need it.
+A more comfortable way of accessing the rotator is through a web Interface.
+You can specify the host and port in the settings above, or deactivate the
+built-in webserver if you don't need it.
 
 The red arrow indicates the heading of the rotator and the yellow arrow
 indicates the preset value to which the rotator will turn to.
 
-If you would like to access remoteRotator via Websockets, then go to the
-url `http://<http-host>:<http-port>/ws`.
+## Web Interface (Aggregator)
 
-**Note:** Currently only horizontal (azimuth) rotators are supported.
+![Alt text](https://i.imgur.com/dzEA56Q.png "remoteRotator WebUI")
+
+If you have multiple rotators, you might want to use the dedicated web server.
+The following example starts the webserver on port 6005 and listens on all
+network interfaces.
+
+```
+$ remoteRotator web -w "0.0.0.0" -k 6005 
+```
+
+The Webserver automatically discovers the available remoteRotator instances
+in your local network and adds them (or removes them) from the web interface.
+Technically the discovery process is based on mDNS and doesn't require any
+configuration.
 
 ## Config file
 
@@ -133,6 +175,9 @@ The format of the file can either be in
 
 The first line after starting remoteRotator will indicate if / which config
 file has been found.
+
+If you have several rotators, you have to create a configuration file for
+each of them and specify them with the --config flag.
 
 Priority:
 

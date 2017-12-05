@@ -14,8 +14,8 @@ var discoverCmd = &cobra.Command{
 	Short: "discover and list all available rotators on the network",
 	Long: `discover and list all available rotators on the network
 
-The commend performs a mDNS query and will report all found rotators
-with their network parameters and description.`,
+This command performs a mDNS query on your local network and will report all
+found rotators with their parameters.`,
 	Run: discoverMDNS,
 }
 
@@ -39,13 +39,28 @@ Found {{. | len}} rotator(s) on this network
 
 {{range .}}Rotator:
    Name:         {{.Name}}
-   Description:  {{.Description}}
    URL:          {{.URL}}
-   Host:         {{.Host}}{{if .AddrV6}}
-   Address IPv6: {{.AddrV6}}{{else}}
-   Address IPv4: {{.AddrV4}}{{end}}
+   Host:         {{.Host}}
+   Address IPv6: {{.AddrV6}}
+   Address IPv4: {{.AddrV4}}
    Port:         {{.Port}}
    
 {{end}}
 `,
 ))
+
+// var tmpl = template.Must(template.New("").Parse(
+// 	`
+// Found {{. | len}} rotator(s) on this network
+
+// {{range .}}Rotator:
+//    Name:         {{.Name}}
+//    URL:          {{.URL}}
+//    Host:         {{.Host}}{{if .AddrV6}}
+//    Address IPv6: {{.AddrV6}}{{else}}
+//    Address IPv4: {{.AddrV4}}{{end}}
+//    Port:         {{.Port}}
+
+// {{end}}
+// `,
+// ))
