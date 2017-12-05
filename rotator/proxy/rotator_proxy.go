@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -90,7 +91,9 @@ func New(done chan struct{}, opts ...func(*Proxy)) (*Proxy, error) {
 		for {
 			_, msg, err := conn.ReadMessage()
 			if err != nil {
-				log.Println("shutdown:", err)
+				if !strings.Contains(err.Error(), "EOF") {
+					log.Println("disconnecting:", err)
+				}
 				return
 			}
 
