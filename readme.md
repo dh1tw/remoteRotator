@@ -11,7 +11,7 @@ antenna rotators available on the network and accessible through a web interface
 
 remoteRotator is written in the programing language [Go](https://golang.org).
 
-![Animated GIF showing the web interface of remoteRotator](http://www.giphy.com/gifs/3oxHQKD4XOH3t3lCtW "remoteRotator WebUI")
+![Animated GIF showing the web interface of remoteRotator](https://media.giphy.com/media/3oxHQKD4XOH3t3lCtW/giphy.gif "remoteRotator WebUI")
 
 **ADVICE**: This project is **under development**. The parameters and the ICD
 are still **not stable** and subject to change until the first major version
