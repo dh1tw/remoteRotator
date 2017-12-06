@@ -39,8 +39,8 @@ func LookupRotators() []RotatorMdnsEntry {
 
 			r := RotatorMdnsEntry{
 				Name:   name,
-				URL:    entry.Name,
-				Host:   entry.Host,
+				URL:    strings.TrimSuffix(entry.Name, "."),
+				Host:   strings.TrimSuffix(entry.Host, "."),
 				AddrV4: entry.AddrV4,
 				AddrV6: entry.AddrV6,
 				Port:   entry.Port,
