@@ -6,11 +6,10 @@
 [![Coverage Status](https://coveralls.io/repos/github/dh1tw/remoteRotator/badge.svg?branch=master)](https://coveralls.io/github/dh1tw/remoteRotator?branch=master)
 [![Downloads](https://img.shields.io/github/downloads/dh1tw/remoteRotator/total.svg?maxAge=1800)](https://github.com/dh1tw/remoteRotator/releases)
 
-remoteRotator is a cross platform application which makes your antenna rotators
-available on the network. remoteRotator implements a statemachine which will
-query in a defineable interval the heading (azimuth and/or elevation) of the 
-rotator. Updates are sent to all connected clients which can also execute 
-commands at any time.
+![Alt text](https://i.imgur.com/lcHhslZ.png "remoteRotator WebUI")
+
+remoteRotator is a cross platform application which makes your azimuth / elevation
+antenna rotators available on the network and accessible through a web interface.
 
 remoteRotator is written in the programing language [Go](https://golang.org).
 
@@ -21,7 +20,8 @@ has been reached.
 ## Supported Rotators
 
 - [Yaesu GS232A](http://www.yaesu.com/indexVS.cfm?cmd=DisplayProducts&ProdCatID=104&encProdID=79A89CEC477AA3B819EE02831F3FD5B8)
-- [EA4TX ARS](http://ea4tx.com/en/)
+- [EA4TX ARS (implements Yaesu GS232A)](http://ea4tx.com/en/)
+- Dummy rotator
 
 ## Supported Transportation Protocols
 
@@ -42,7 +42,8 @@ is just a single executable.
 
 ## Dependencies
 
-remoteRotator does not have any external dependencies.
+remoteRotator only depends on a few go libraries which are needed at compile
+time. There are no runtime dependencies.
 
 ## Getting started
 
@@ -68,7 +69,6 @@ Flags:
       --azimuth-min int        metadata: minimum azimuth (in deg)
       --azimuth-stop int       metadata: mechanical azimuth stop (in deg)
   -b, --baudrate int           baudrate (default 9600)
-  -d, --description string     Description (default "Yaesu G1000 with 4el 20m Yagi@18m ASL")
       --discovery-enabled      make rotator discoverable on the network (default true)
       --elevation-max int      metadata: maximum elevation (in deg) (default 180)
       --elevation-min int      metadata: minimum elevation (in deg)
@@ -84,14 +84,14 @@ Flags:
       --tcp-enabled            enable TCP Server (default true)
   -u, --tcp-host string        Host (use '0.0.0.0' to listen on all network adapters) (default "127.0.0.1")
   -p, --tcp-port int           TCP Port (default 7373)
-  -t, --type string            Rotator type (supported: ARS (default "ARS")
+  -t, --type string            Rotator type (supported: yaesu, dummy (default "yaesu")
 
 Global Flags:
       --config string   config file (default is $HOME/.remoteRotator.yaml)
 ```
 
-So in order to launch remoteRotator on Windows with an ARS connected at COM3
-and having the server listening on the network port 5050, we would call:
+So in order to launch remoteRotator on Windows with a Yaesu rotator connected at
+COM3 and having the server listening on the network port 5050, we would call:
 
 ```bash
 $ remoteRotator server tcp -u "0.0.0.0" -p 5050 -P "COM3"
@@ -104,22 +104,73 @@ Listening on 0.0.0.0:7070 for HTTP connections
 
 ```
 
+remoteRotator allows to set a few useful metadata:
+
+- azimuth/elevation min/max
+- mechanical stop
+
+## Connecting via TCP / Telnet
+
+If you have an application (e.g. [arsvcom](https://ea4tx.com/en/arsvcom/) or
+[pstrotator](http://www.qsl.net/yo3dmu/index_Page346.htm)) which can talk to
+a Yaesu compatible rotator, you can point that application to the selected
+TCP port.
+
+You can also connect directly via telnet:
+
+```
+$ telnet localhost 5050
+Trying ::1...
+Connected to localhost.
+Escape character is '^]'.
+
+?>C
++0303
+C2
++0303+0000
+M310
++0303+0000
++0304+0000
++0305+0000
++0306+0000
++0307+0000
++0307+0000
++0308+0000
++0309+0000
++0310+0000
+```
+
 ## Web Interface
 
+![Alt text](https://i.imgur.com/wPup7BJ.png "remoteRotator WebUI")
 
-![Alt text](https://i.imgur.com/X8zJwQO.png "remoteRotator WebUI")
-
-Appart of connecting to the rotator through a TCP socket, you can also
-access the rotator through a web Interface. You can specify the host and port
-in the settings above, or deactivate the built-in webserver if you don't need it.
+A more comfortable way of accessing the rotator is through a web Interface.
+You can specify the host and port in the settings above, or deactivate the
+built-in webserver if you don't need it.
 
 The red arrow indicates the heading of the rotator and the yellow arrow
 indicates the preset value to which the rotator will turn to.
 
-If you would like to access remoteRotator via Websockets, then go to the
-url `http://<http-host>:<http-port>/ws`.
+The dotted red line indicates the mechanical stop of the rotator.
+The green arc segment indicates a limited turning radius for this rotator.
+The blue arc segment indicates the mechanical overlap supported by this rotator.
 
-**Note:** Currently only horizontal (azimuth) rotators are supported.
+## Web Interface (Aggregator)
+
+![Alt text](https://i.imgur.com/lcHhslZ.png "remoteRotator WebUI")
+
+If you have multiple rotators, you might want to use the dedicated web server.
+The following example starts the webserver on port 6005 and listens on all
+network interfaces.
+
+```
+$ remoteRotator web -w "0.0.0.0" -k 6005 
+```
+
+The Webserver automatically discovers the available remoteRotator instances
+in your local network and adds them (or removes them) from the web interface.
+Technically the discovery process is based on mDNS and doesn't require any
+configuration.
 
 ## Config file
 
@@ -134,9 +185,12 @@ The format of the file can either be in
 The first line after starting remoteRotator will indicate if / which config
 file has been found.
 
+If you have several rotators, you have to create a configuration file for
+each of them and specify them with the --config flag.
+
 Priority:
 
-1. Pflags (e.g. -p 4040 -t ARS)
+1. Pflags (e.g. -p 4040 -t dummy)
 2. Values from config file
 3. Default values
 

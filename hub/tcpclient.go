@@ -17,8 +17,7 @@ type TCPClient struct {
 	net.Conn
 }
 
-// listen starts listening for incoming messages from tcp connections. This
-// function is typically executed in a go routine to avoid blocking. When
+// listen starts listening for incoming messages from tcp connections. When
 // a error occurs, the routine returns and deletes the tcp connection.
 // Since this method contains an endless loop it should be executed
 // in a go routine.

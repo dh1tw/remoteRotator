@@ -17,43 +17,115 @@ import (
 // Hub is a struct which makes a rotator available through network
 // interfaces, supporting several protocols.
 type Hub struct {
-	sync.Mutex
+	sync.RWMutex
 	tcpClients     map[*TCPClient]bool
 	closeTCPClient chan *TCPClient
 	wsClients      map[*WsClient]bool
 	closeWsClient  chan *WsClient
-	rotator        rotator.Rotator
+	rotators       map[string]rotator.Rotator //key: Rotator name
 }
 
-// NewHub returns the pointer to an initialized Hub object for a
-// given rotator.
-func NewHub(r rotator.Rotator) *Hub {
+// NewHub returns the pointer to an initialized Hub object.
+func NewHub(rotators ...rotator.Rotator) (*Hub, error) {
 	hub := &Hub{
 		tcpClients:     make(map[*TCPClient]bool),
 		closeTCPClient: make(chan *TCPClient),
 		wsClients:      make(map[*WsClient]bool),
 		closeWsClient:  make(chan *WsClient),
-		rotator:        r,
+		rotators:       make(map[string]rotator.Rotator),
+	}
+
+	for _, r := range rotators {
+		if err := hub.AddRotator(r); err != nil {
+			return nil, err
+		}
 	}
 
 	go hub.handleClose()
 
-	return hub
+	return hub, nil
 }
 
 func (hub *Hub) handleClose() {
 	for {
 		select {
 		case c := <-hub.closeTCPClient:
-			hub.RemoveTCPClient(c)
+			hub.removeTCPClient(c)
 		case c := <-hub.closeWsClient:
-			hub.RemoveWsClient(c)
+			hub.removeWsClient(c)
 		}
 	}
 }
 
-// AddTCPClient registers a new tcp client
-func (hub *Hub) AddTCPClient(client *TCPClient) {
+// AddRotator adds / registers a rotator. The rotator's name must be unique.
+func (hub *Hub) AddRotator(r rotator.Rotator) error {
+	hub.Lock()
+	defer hub.Unlock()
+
+	return hub.addRotator(r)
+}
+
+func (hub *Hub) addRotator(r rotator.Rotator) error {
+	_, ok := hub.rotators[r.Name()]
+	if ok {
+		return fmt.Errorf("rotator names must be unique; %s provided twice", r.Name())
+	}
+	hub.rotators[r.Name()] = r
+	ev := Event{
+		Name:    AddRotator,
+		Rotator: r.Info(),
+	}
+	if err := hub.broadcastToWsClients(ev); err != nil {
+		fmt.Println(err)
+	}
+	log.Printf("adding rotator (%s)\n", r.Name())
+
+	return nil
+}
+
+// RemoveRotator deletes / de-registers a rotator.
+func (hub *Hub) RemoveRotator(r rotator.Rotator) {
+	hub.Lock()
+	defer hub.Unlock()
+
+	ev := Event{
+		Name:    RemoveRotator,
+		Rotator: r.Info(),
+	}
+
+	if err := hub.broadcastToWsClients(ev); err != nil {
+		fmt.Println(err)
+	}
+
+	delete(hub.rotators, r.Name())
+	// TBD: Make sure rotator gets destroyed !!!!! (eg websocket closed, etc)
+	log.Printf("removing rotator (%s)\n", r.Name())
+}
+
+// HasRotator returns a bool if a given rotator is already registered.
+func (hub *Hub) HasRotator(name string) bool {
+	hub.RLock()
+	defer hub.RUnlock()
+
+	_, ok := hub.rotators[name]
+	return ok
+}
+
+// Rotators returns a slice of all registered rotators.
+func (hub *Hub) Rotators() []rotator.Rotator {
+	hub.RLock()
+	defer hub.RUnlock()
+
+	rotators := make([]rotator.Rotator, 0, len(hub.rotators))
+	for _, r := range hub.rotators {
+		rotators = append(rotators, r)
+	}
+
+	return rotators
+}
+
+// addTCPClient registers a new tcp client
+func (hub *Hub) addTCPClient(client *TCPClient) {
 	hub.Lock()
 	defer hub.Unlock()
 
@@ -63,11 +135,17 @@ func (hub *Hub) AddTCPClient(client *TCPClient) {
 	hub.tcpClients[client] = true
 	// start listening on TCP socket
 	log.Printf("tcp client connected (%v)\n", client.RemoteAddr())
-	go client.listen(hub.rotator, hub.closeTCPClient)
+
+	// we always pick the first rotator since the TCP client implements
+	// the Yaesu GS232 protocol which can only talk to a single rotator.
+	for _, r := range hub.rotators {
+		go client.listen(r, hub.closeTCPClient)
+		break
+	}
 }
 
 // RemoveTCPClient removes a tcp client
-func (hub *Hub) RemoveTCPClient(c *TCPClient) {
+func (hub *Hub) removeTCPClient(c *TCPClient) {
 	hub.Lock()
 	defer hub.Unlock()
 
@@ -79,8 +157,8 @@ func (hub *Hub) RemoveTCPClient(c *TCPClient) {
 	log.Printf("tcp client disconnected (%v)\n", c.RemoteAddr())
 }
 
-// AddWsClient registers a new tcp client
-func (hub *Hub) AddWsClient(client *WsClient) {
+// AddWsClient registers a new websocket client
+func (hub *Hub) addWsClient(client *WsClient) {
 	hub.Lock()
 	defer hub.Unlock()
 
@@ -88,13 +166,13 @@ func (hub *Hub) AddWsClient(client *WsClient) {
 		delete(hub.wsClients, client)
 	}
 	hub.wsClients[client] = true
-	// TBD: Start listening on websocket
+
 	log.Printf("websocket client connected (%v)\n", client.RemoteAddr())
-	go client.listen(hub.rotator, hub.closeWsClient)
+	go client.listen(hub, hub.closeWsClient)
 }
 
-// RemoveWsClient removes a tcp client
-func (hub *Hub) RemoveWsClient(c *WsClient) {
+// removeWsClient removes a websocket client
+func (hub *Hub) removeWsClient(c *WsClient) {
 	hub.Lock()
 	defer hub.Unlock()
 
@@ -116,26 +194,26 @@ func (hub *Hub) ListenTCP(host string, port int, tcpError chan<- bool) {
 	// Listen for incoming connections.
 	l, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
-		log.Printf("tcp listener error: %v", err.Error())
+		log.Printf("tcp listener error (%v)", err.Error())
+		return
 	}
 
 	// Close the listener when the application closes.
 	defer l.Close()
 
-	fmt.Printf("Listening on %s:%d for TCP connections\n", host, port)
+	log.Printf("listening on %s:%d for TCP connections\n", host, port)
 
 	for {
 		// Listen for an incoming connection.
 		conn, err := l.Accept()
 		if err != nil {
-			fmt.Println("Error accepting: ", err.Error())
-			// os.Exit(1)
+			log.Println("error accepting: ", err.Error())
 		}
 
 		c := &TCPClient{
 			Conn: conn,
 		}
-		hub.AddTCPClient(c)
+		hub.addTCPClient(c)
 	}
 }
 
@@ -155,14 +233,31 @@ func (hub *Hub) wsHandler(w http.ResponseWriter, r *http.Request) {
 		Conn: conn,
 	}
 
-	s := hub.rotator.Status()
-	c.write(s)
+	hub.RLock()
+	for _, r := range hub.rotators {
+		ev := Event{
+			Name:    AddRotator,
+			Rotator: r.Info(),
+		}
+		if err := c.write(ev); err != nil {
+			fmt.Println(err)
+		}
+	}
+	hub.RUnlock()
 
-	hub.AddWsClient(c)
+	hub.addWsClient(c)
 }
 
 func (hub *Hub) infoHandler(w http.ResponseWriter, r *http.Request) {
-	i := []rotator.Info{hub.rotator.Info()}
+
+	hub.RLock()
+	defer hub.RUnlock()
+
+	i := []rotator.Info{}
+
+	for _, r := range hub.rotators {
+		i = append(i, r.Info())
+	}
 
 	data, err := json.Marshal(i)
 	if err != nil {
@@ -190,7 +285,7 @@ func (hub *Hub) ListenHTTP(host string, port int, wsError chan<- bool) {
 	http.HandleFunc("/ws", hub.wsHandler)
 
 	// Listen for incoming connections.
-	fmt.Printf("Listening on %s:%d for HTTP connections\n", host, port)
+	log.Printf("listening on %s:%d for HTTP connections\n", host, port)
 
 	err := http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), nil)
 	if err != nil {
@@ -203,7 +298,12 @@ func (hub *Hub) ListenHTTP(host string, port int, wsError chan<- bool) {
 func (hub *Hub) Broadcast(s rotator.Status) {
 
 	hub.BroadcastToTCPClients(s)
-	if err := hub.BroadcastToWsClients(s); err != nil {
+
+	ev := Event{
+		Name:   UpdateHeading,
+		Status: s,
+	}
+	if err := hub.BroadcastToWsClients(ev); err != nil {
 		log.Println(err)
 	}
 }
@@ -228,14 +328,34 @@ func (hub *Hub) BroadcastToTCPClients(s rotator.Status) {
 	}
 }
 
+type Event struct {
+	Name     RotatorEvent   `json:"name,omitempty"`
+	Rotator  rotator.Info   `json:"rotator,omitempty"`
+	Rotators []rotator.Info `json:"rotators,omitempty"`
+	Status   rotator.Status `json:"status,omitempty"`
+}
+
+type RotatorEvent string
+
+const (
+	AddRotator    RotatorEvent = "add"
+	RemoveRotator RotatorEvent = "remove"
+	UpdateHeading RotatorEvent = "heading"
+)
+
 // BroadcastToWsClients will send a rotator.Status struct to all clients
 // connected through a Websocket
-func (hub *Hub) BroadcastToWsClients(s rotator.Status) error {
+func (hub *Hub) BroadcastToWsClients(event Event) error {
 	hub.Lock()
 	defer hub.Unlock()
 
+	return hub.broadcastToWsClients(event)
+}
+
+func (hub *Hub) broadcastToWsClients(event Event) error {
+
 	for c := range hub.wsClients {
-		if err := c.write(s); err != nil {
+		if err := c.write(event); err != nil {
 			log.Printf("error writing to client %v: %v\n", c.RemoteAddr(), err)
 			log.Printf("disconnecting client %v\n", c.RemoteAddr())
 			c.Close()

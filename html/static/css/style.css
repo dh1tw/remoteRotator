@@ -1,33 +1,52 @@
+@font-face {
+    font-family: 'Inconsolata';
+    src: url('/static/fonts/Inconsolata-Regular.ttf') format('truetype');
+}
 
 body {
     padding-top: 20px;
-    font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+    font: 18px "Inconsolata", monospaced;
     background-color: black;
 }
 
 #app {
-    width: 100%;
+    width: fit-content;
     margin-left: auto;
     margin-right: auto;
     padding-left: 20px;
+    padding-right: 20px;
 }
 
 .main-rotator {
     display: inline-block;
     min-width: 220px;
+    vertical-align: top;
 }
 
-#azimuth-rotator {
-
-}
-
-
-.main-rotator .name {
+.rotator-name {
     color: white;
     text-align: center;
-    padding: 5px;
     border: 3px solid #5cb85c;
     border-radius: 8px;
+}
+
+.rotator-name .tag {
+    margin: 0; 
+    padding: 5px;
+    padding-right: 10px;
+    background-color: #5cb85c;
+    height: 100%;
+    float: left;
+    vertical-align: top;
+}
+
+.rotator-name .name {
+    padding: 5px;
+    height: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* max-width: 80%; to be improved */
+    white-space: nowrap;
 }
 
 .rotator-canvas {
@@ -37,11 +56,21 @@ body {
     padding-right: 10px;
 }
 
+.mini-rotators ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+.mini-rotator-btn{
+    font-size: 18px;
+}
+
 .mini-rotator-btn.active,
-#mini-rotator-btn.btn:active {
+.mini-rotator-btn.btn:active {
     background-color: #5cb85c;
     color: white;
-    border-color: #26BBA6;
+    border-color: #3C753C;
+    outline:none !important;
 }
 
 .hidden {
@@ -49,17 +78,16 @@ body {
     visibility: hidden;
 }
 
-
-#mini-rotators {
+.mini-rotators {
     border-top: 5px solid white;
     margin: 5px 0 15px 0;
     padding-top: 15px;
-    width: 275px;
+    /* display: inline-block; */
+    /* width: inherit; */
+    /* min-width: 220px; */
 }
 
 .mini-rotator {
-    width: 80px;
-    height: 105px;
     float: left;
     margin: 5px 5px 5px 5px;
 }
@@ -68,7 +96,12 @@ body {
     color: white;
     text-align: center;
     margin-bottom: 5px;
-    width: 80px;
+    padding-left: 5px;
+    padding-right: 5px;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 110px;
 }
 
 .mini-rotator-canvas {
@@ -87,20 +120,6 @@ body {
     bottom: 0px;
 }
 
-.modal-input {
-    width: 100%;
-    padding: 5px;
-}
-
-.settings-input {
-    margin-bottom: 15px;
-}
-
-.mynavbar .settings {
-    cursor: pointer;
-}
-
-
 #connection {
     bottom: 0px;
     left: 0px;
@@ -111,7 +130,9 @@ body {
 }
 
 #connection p {
+    height: inherit;
     text-align: center;
     padding-top: 10px;
     padding-bottom: 10px;
+    font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
 }

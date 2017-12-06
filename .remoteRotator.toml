@@ -12,7 +12,7 @@ port = 7070
 enabled = true
 
 [rotator]
-type = "ARS"
+type = "yaesu"
 name = "myRotator"
 portname = "/dev/ttyACM0"
 baudrate = 9600
@@ -20,7 +20,7 @@ has-azimuth = true
 has-elevation = false
 pollingrate = "1s"
 azimuth-min = 0
-azimuth-max = 450
+azimuth-max = 360
 azimuth-stop = 0
 elevation-min = 0
 elevation-max = 180
