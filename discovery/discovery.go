@@ -3,6 +3,7 @@ package discovery
 import (
 	"net"
 	"strings"
+	"time"
 
 	"github.com/micro/mdns"
 )
@@ -19,7 +20,7 @@ type RotatorMdnsEntry struct {
 
 // LookupRotators will perform an mDNS query are lookup all available
 // rotators on the network.
-func LookupRotators() []RotatorMdnsEntry {
+func LookupRotators() ([]RotatorMdnsEntry, error) {
 	entriesCh := make(chan *mdns.ServiceEntry, 100)
 
 	// rotators := []*mdns.ServiceEntry{}
@@ -49,9 +50,19 @@ func LookupRotators() []RotatorMdnsEntry {
 		}
 	}()
 
+	qp := mdns.QueryParam{
+		Service: "rotators.shackbus",
+		Timeout: time.Second * 4,
+		Entries: entriesCh,
+	}
+
 	// Start the lookup
-	mdns.Lookup("rotators.shackbus", entriesCh)
+	if err := mdns.Query(&qp); err != nil {
+		return rotators, err
+	}
+
+	// mdns.Lookup("rotators.shackbus", entriesCh)
 
 	close(entriesCh)
-	return rotators
+	return rotators, nil
 }

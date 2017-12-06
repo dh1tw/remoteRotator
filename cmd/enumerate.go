@@ -26,7 +26,11 @@ func init() {
 func discoverMDNS(cmd *cobra.Command, args []string) {
 
 	fmt.Println("\n...discovering rotators (please wait)")
-	rots := discovery.LookupRotators()
+	rots, err := discovery.LookupRotators()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	if err := tmpl.Execute(os.Stdout, rots); err != nil {
 		fmt.Println(err)

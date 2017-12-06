@@ -97,7 +97,11 @@ var ev = func(r rotator.Rotator, ev rotator.Event, value ...interface{}) {
 
 func (w *webserver) update() {
 
-	dsvrdRotators := discovery.LookupRotators()
+	dsvrdRotators, err := discovery.LookupRotators()
+	if err != nil {
+		log.Println(err)
+		return
+	}
 
 	// check if rotator(s) are not registered yet
 	for _, dr := range dsvrdRotators {
