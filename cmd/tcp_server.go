@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -247,21 +248,9 @@ func tcpServer(cmd *cobra.Command, args []string) {
 	mDNSShutdown := make(chan struct{})
 
 	if viper.GetBool("discovery.enabled") {
-		go func() {
-			mDNSService, err := mdns.NewMDNSService(viper.GetString("rotator.name"),
-				"rotators.shackbus", "", "", viper.GetInt("http.port"),
-				[]net.IP{getOutboundIP()}, nil)
-
-			if err != nil {
-				log.Printf("unable to start mDNS discovery service: %s\n", err)
-				log.Println("mDNS discovery is disabled")
-				return
-			}
-
-			mDNSServer, _ := mdns.NewServer(&mdns.Config{Zone: mDNSService})
-			defer mDNSServer.Shutdown()
-			<-mDNSShutdown
-		}()
+		if err := startMdnsServer(mDNSShutdown); err != nil {
+			log.Println(err)
+		}
 	}
 
 	// Channel to handle OS signals
@@ -289,6 +278,39 @@ func tcpServer(cmd *cobra.Command, args []string) {
 		}
 	}
 
+}
+
+func startMdnsServer(shutdown <-chan struct{}) error {
+
+	if !viper.GetBool("http.enabled") {
+		return fmt.Errorf("for discovery, enable HTTP")
+	}
+
+	netif := net.ParseIP(viper.GetString("http.host"))
+
+	if bytes.Compare(netif, net.IPv4zero) != 0 &&
+		bytes.Compare(netif, net.IPv6zero) != 0 &&
+		bytes.Compare(netif, getOutboundIP()) != 0 {
+		return fmt.Errorf("for discovery, the http server must listen on an accessible network interface (e.g. 0.0.0.0)")
+	}
+
+	go func() {
+		mDNSService, err := mdns.NewMDNSService(viper.GetString("rotator.name"),
+			"rotators.shackbus", "", "", viper.GetInt("http.port"),
+			[]net.IP{getOutboundIP()}, nil)
+
+		if err != nil {
+			log.Printf("unable to start mDNS discovery service: %s\n", err)
+			log.Println("mDNS discovery is disabled")
+			return
+		}
+
+		mDNSServer, _ := mdns.NewServer(&mdns.Config{Zone: mDNSService})
+		defer mDNSServer.Shutdown()
+		<-shutdown
+	}()
+
+	return nil
 }
 
 func encodeInfo(i rotator.Info) (string, error) {
