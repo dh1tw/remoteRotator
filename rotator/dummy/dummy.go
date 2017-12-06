@@ -118,7 +118,7 @@ func EventHandler(h func(rotator.Rotator, rotator.Event, ...interface{})) func(*
 // will be returned.
 // Default settings are:
 // hasAzimuth: true,
-// azimuthMax: 450,
+// azimuthMax: 360,
 // elevationMax: 180,
 // azSpeed: 8, (deg/sec)
 // elSpeed: 5, (deg/sec)
