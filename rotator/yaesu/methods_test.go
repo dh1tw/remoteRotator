@@ -451,16 +451,19 @@ func TestNewYaesuPortNotExist(t *testing.T) {
 		name     string
 		portName func(*Yaesu)
 		expError string
+		altError string
 	}{
-		{"port does not exist", Portname("/dev/ttyXXXXX"), "open /dev/ttyXXXXX: no such file or directory"},
-		{"invalid serial port", Portname("/dev/null"), "File is not a tty"},
+		{"port does not exist", Portname("/dev/ttyXXXXX"), "open /dev/ttyXXXXX: no such file or directory", ""},
+		{"invalid serial port", Portname("/dev/null"), "File is not a tty", "inappropriate ioctl for device"},
 	}
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := NewYaesu(tc.portName)
 			if err.Error() != tc.expError {
-				t.Fatalf("expected error '%s', got '%s'", tc.expError, err.Error())
+				if err.Error() != tc.altError {
+					t.Fatalf("expected error '%s', got '%s'", tc.expError, err.Error())
+				}
 			}
 		})
 	}
