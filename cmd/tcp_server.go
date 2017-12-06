@@ -283,7 +283,7 @@ func tcpServer(cmd *cobra.Command, args []string) {
 func startMdnsServer(shutdown <-chan struct{}) error {
 
 	if !viper.GetBool("http.enabled") {
-		return fmt.Errorf("for discovery, enable HTTP")
+		return fmt.Errorf("discovery disabled; the HTTP server must be enabled and accessible over a network interface (e.g. 0.0.0.0)")
 	}
 
 	netif := net.ParseIP(viper.GetString("http.host"))
@@ -291,7 +291,7 @@ func startMdnsServer(shutdown <-chan struct{}) error {
 	if bytes.Compare(netif, net.IPv4zero) != 0 &&
 		bytes.Compare(netif, net.IPv6zero) != 0 &&
 		bytes.Compare(netif, getOutboundIP()) != 0 {
-		return fmt.Errorf("for discovery, the http server must listen on an accessible network interface (e.g. 0.0.0.0)")
+		return fmt.Errorf("discovery disabled; the HTTP server must listen on an accessible network interface (e.g. 0.0.0.0)")
 	}
 
 	go func() {
@@ -300,8 +300,7 @@ func startMdnsServer(shutdown <-chan struct{}) error {
 			[]net.IP{getOutboundIP()}, nil)
 
 		if err != nil {
-			log.Printf("unable to start mDNS discovery service: %s\n", err)
-			log.Println("mDNS discovery is disabled")
+			log.Printf("discovery disabled; unable to start mDNS service: %s\n", err)
 			return
 		}
 
