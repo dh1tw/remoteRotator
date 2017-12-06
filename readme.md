@@ -6,14 +6,12 @@
 [![Coverage Status](https://coveralls.io/repos/github/dh1tw/remoteRotator/badge.svg?branch=master)](https://coveralls.io/github/dh1tw/remoteRotator?branch=master)
 [![Downloads](https://img.shields.io/github/downloads/dh1tw/remoteRotator/total.svg?maxAge=1800)](https://github.com/dh1tw/remoteRotator/releases)
 
-![Alt text](https://i.imgur.com/dzEA56Q.png "remoteRotator WebUI")
+![Alt text](https://i.imgur.com/lcHhslZ.png "remoteRotator WebUI")
 
 remoteRotator is a cross platform application which makes your azimuth / elevation
 antenna rotators available on the network and accessible through a web interface.
 
 remoteRotator is written in the programing language [Go](https://golang.org).
-
-
 
 **ADVICE**: This project is **under development**. The parameters and the ICD
 are still **not stable** and subject to change until the first major version
@@ -106,6 +104,11 @@ Listening on 0.0.0.0:7070 for HTTP connections
 
 ```
 
+remoteRotator allows to set a few useful metadata:
+
+- azimuth/elevation min/max
+- mechanical stop
+
 ## Connecting via TCP / Telnet
 
 If you have an application (e.g. [arsvcom](https://ea4tx.com/en/arsvcom/) or
@@ -139,7 +142,7 @@ M310
 
 ## Web Interface
 
-![Alt text](https://i.imgur.com/NcWHpYs.png "remoteRotator WebUI")
+![Alt text](https://i.imgur.com/wPup7BJ.png "remoteRotator WebUI")
 
 A more comfortable way of accessing the rotator is through a web Interface.
 You can specify the host and port in the settings above, or deactivate the
@@ -148,9 +151,13 @@ built-in webserver if you don't need it.
 The red arrow indicates the heading of the rotator and the yellow arrow
 indicates the preset value to which the rotator will turn to.
 
+The dotted red line indicates the mechanical stop of the rotator.
+The green arc segment indicates a limited turning radius for this rotator.
+The blue arc segment indicates the mechanical overlap supported by this rotator.
+
 ## Web Interface (Aggregator)
 
-![Alt text](https://i.imgur.com/dzEA56Q.png "remoteRotator WebUI")
+![Alt text](https://i.imgur.com/lcHhslZ.png "remoteRotator WebUI")
 
 If you have multiple rotators, you might want to use the dedicated web server.
 The following example starts the webserver on port 6005 and listens on all
