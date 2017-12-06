@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -248,7 +249,8 @@ func tcpServer(cmd *cobra.Command, args []string) {
 	if viper.GetBool("discovery.enabled") {
 		go func() {
 			mDNSService, err := mdns.NewMDNSService(viper.GetString("rotator.name"),
-				"rotators.shackbus", "", "", viper.GetInt("http.port"), nil, nil)
+				"rotators.shackbus", "", "", viper.GetInt("http.port"),
+				[]net.IP{getOutboundIP()}, nil)
 
 			if err != nil {
 				log.Printf("unable to start mDNS discovery service: %s\n", err)
@@ -297,4 +299,17 @@ func encodeInfo(i rotator.Info) (string, error) {
 
 	uEnc := b64.URLEncoding.EncodeToString(res)
 	return uEnc, nil
+}
+
+// Get preferred outbound ip of this machine
+func getOutboundIP() net.IP {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP
 }
