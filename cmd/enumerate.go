@@ -40,27 +40,11 @@ Found {{. | len}} rotator(s) on this network
 {{range .}}Rotator:
    Name:         {{.Name}}
    URL:          {{.URL}}
-   Host:         {{.Host}}
-   Address IPv6: {{.AddrV6}}
-   Address IPv4: {{.AddrV4}}
+   Host:         {{.Host}}{{if .AddrV4}}
+   Address IPv4: {{.AddrV4}}{{else}}
+   Address IPv6: {{.AddrV6}}{{end}}
    Port:         {{.Port}}
-   
+
 {{end}}
 `,
 ))
-
-// var tmpl = template.Must(template.New("").Parse(
-// 	`
-// Found {{. | len}} rotator(s) on this network
-
-// {{range .}}Rotator:
-//    Name:         {{.Name}}
-//    URL:          {{.URL}}
-//    Host:         {{.Host}}{{if .AddrV6}}
-//    Address IPv6: {{.AddrV6}}{{else}}
-//    Address IPv4: {{.AddrV4}}{{end}}
-//    Port:         {{.Port}}
-
-// {{end}}
-// `,
-// ))
