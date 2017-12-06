@@ -6,12 +6,14 @@
 [![Coverage Status](https://coveralls.io/repos/github/dh1tw/remoteRotator/badge.svg?branch=master)](https://coveralls.io/github/dh1tw/remoteRotator?branch=master)
 [![Downloads](https://img.shields.io/github/downloads/dh1tw/remoteRotator/total.svg?maxAge=1800)](https://github.com/dh1tw/remoteRotator/releases)
 
+![Alt text](https://i.imgur.com/dzEA56Q.png "remoteRotator WebUI")
+
 remoteRotator is a cross platform application which makes your azimuth / elevation
 antenna rotators available on the network and accessible through a web interface.
 
 remoteRotator is written in the programing language [Go](https://golang.org).
 
-![Animated GIF showing the web interface of remoteRotator](https://s1.gifyu.com/images/source9a7f4d772b50c104.md.gif)
+
 
 **ADVICE**: This project is **under development**. The parameters and the ICD
 are still **not stable** and subject to change until the first major version
