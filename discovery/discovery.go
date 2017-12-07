@@ -3,7 +3,6 @@ package discovery
 import (
 	"net"
 	"strings"
-	"time"
 
 	"github.com/micro/mdns"
 )
@@ -50,18 +49,9 @@ func LookupRotators() ([]RotatorMdnsEntry, error) {
 		}
 	}()
 
-	qp := mdns.QueryParam{
-		Service: "rotators.shackbus",
-		Timeout: time.Second * 4,
-		Entries: entriesCh,
-	}
-
-	// Start the lookup
-	if err := mdns.Query(&qp); err != nil {
-		return rotators, err
-	}
-
-	// mdns.Lookup("rotators.shackbus", entriesCh)
+	// perform mDNS lookup on all interfaces (default) and wait for 1 sec
+	// for responses (default)
+	mdns.Lookup("rotators.shackbus", entriesCh)
 
 	close(entriesCh)
 	return rotators, nil

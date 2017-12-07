@@ -28,6 +28,7 @@ type Rotator interface {
 	Status() Status
 	ExecuteRequest(Request) error
 	Info() Info
+	Close()
 }
 
 // Status contains the current information from a rotator. The struct

@@ -109,7 +109,8 @@ func (w *webserver) update() {
 		// if the rotator is new, then add it
 		if !w.HasRotator(dr.Name) {
 
-			done := make(chan struct{})
+			doneCh := make(chan struct{})
+			done := proxy.DoneCh(doneCh)
 			host := proxy.Host(dr.AddrV4.String())
 			port := proxy.Port(dr.Port)
 			eh := proxy.EventHandler(ev)
@@ -123,22 +124,9 @@ func (w *webserver) update() {
 				continue
 			}
 			go func() {
-				<-done
+				<-doneCh
 				w.RemoveRotator(r)
 			}()
-		}
-	}
-
-	// check if a rotator has to be removed
-	for _, r := range w.Rotators() {
-		found := false
-		for _, dr := range dsvrdRotators {
-			if dr.Name == r.Name() {
-				found = true
-			}
-		}
-		if !found {
-			w.RemoveRotator(r)
 		}
 	}
 }

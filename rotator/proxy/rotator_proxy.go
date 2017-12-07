@@ -37,6 +37,8 @@ type Proxy struct {
 	azPreset       int
 	elevation      int
 	elPreset       int
+	closeCh        chan struct{}
+	doneCh         chan struct{}
 }
 
 // Host is a functional option to set IP / dns name of the remote Rotators host.
@@ -53,6 +55,14 @@ func Port(port int) func(*Proxy) {
 	}
 }
 
+// DoneCh is a functional option allows you to pass a channel to the proxy object.
+// The channel will be closed and thus notifies you when the object has been deleted.
+func DoneCh(ch chan struct{}) func(*Proxy) {
+	return func(r *Proxy) {
+		r.doneCh = ch
+	}
+}
+
 // EventHandler sets a callback function through which the proxy rotator
 // will report Events
 func EventHandler(h func(rotator.Rotator, rotator.Event, ...interface{})) func(*Proxy) {
@@ -62,10 +72,11 @@ func EventHandler(h func(rotator.Rotator, rotator.Event, ...interface{})) func(*
 }
 
 // New returns the pointer to an initalized Rotator proxy object.
-func New(done chan struct{}, opts ...func(*Proxy)) (*Proxy, error) {
+func New(opts ...func(*Proxy)) (*Proxy, error) {
 
 	r := &Proxy{
-		name: "rotatorProxy",
+		name:    "rotatorProxy",
+		closeCh: make(chan struct{}),
 	}
 
 	for _, opt := range opts {
@@ -87,13 +98,13 @@ func New(done chan struct{}, opts ...func(*Proxy)) (*Proxy, error) {
 	r.conn = conn
 
 	go func() {
-		defer close(done)
 		for {
 			_, msg, err := conn.ReadMessage()
 			if err != nil {
 				if !strings.Contains(err.Error(), "EOF") {
 					log.Println("disconnecting:", err)
 				}
+				close(r.doneCh)
 				return
 			}
 
@@ -140,6 +151,14 @@ func New(done chan struct{}, opts ...func(*Proxy)) (*Proxy, error) {
 	}()
 
 	return r, nil
+}
+
+func (r *Proxy) Close() {
+	if r.conn != nil {
+		if err := r.conn.Close(); err != nil {
+			log.Println(err)
+		}
+	}
 }
 
 func (r *Proxy) getInfo() error {

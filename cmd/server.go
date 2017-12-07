@@ -12,10 +12,10 @@ var serverCmd = &cobra.Command{
 	Short: "remoteRotator Server",
 	Long: `Run a remoteRotator server
 
-Start a remoteRotator server using a specific transportation protocol.
+Start a remoteRotator server using a specific transportation protocols.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Please select a transportation protocol (--help for available options)")
+		fmt.Println("Please select the server type (--help for available options)")
 	},
 }
 

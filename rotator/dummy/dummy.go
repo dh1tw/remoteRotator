@@ -32,6 +32,7 @@ type Dummy struct {
 	tickerInterval float32 //ms
 	closeCh        chan struct{}
 	starter        sync.Once
+	closer         sync.Once
 }
 
 // Name is a functional option to set the name of the rotator
@@ -131,6 +132,7 @@ func NewDummyRotator(options ...func(*Dummy)) (*Dummy, error) {
 		azSpeed:        8,
 		elSpeed:        5,
 		tickerInterval: 100,
+		closeCh:        make(chan struct{}),
 	}
 
 	for _, opt := range options {
@@ -147,20 +149,15 @@ func NewDummyRotator(options ...func(*Dummy)) (*Dummy, error) {
 		r.elevation = float32(r.elevationMin)
 	}
 
+	r.ticker = time.NewTicker(time.Millisecond * time.Duration(r.tickerInterval))
+
+	go r.start()
+
 	return r, nil
 }
 
-// Start starts the main event loop for the dummy rotator. The event loop can be
-// shutdown by closing the shutdown channel.
-func (r *Dummy) Start(shutdown <-chan struct{}) {
-	// ensure that the event loop is only started once
-	r.starter.Do(func() {
-		go r.start(shutdown)
-	})
-}
-
-// start the event loop
-func (r *Dummy) start(shutdown <-chan struct{}) {
+// // start the event loop
+func (r *Dummy) start() {
 
 	r.ticker = time.NewTicker(time.Millisecond * time.Duration(r.tickerInterval))
 	defer r.ticker.Stop()
@@ -169,10 +166,17 @@ func (r *Dummy) start(shutdown <-chan struct{}) {
 		select {
 		case <-r.ticker.C:
 			r.updateHeadings()
-		case <-shutdown:
+		case <-r.closeCh:
 			return
 		}
 	}
+}
+
+// Close shuts down the rotator and prepares it for garbage collection
+func (r *Dummy) Close() {
+	r.closer.Do(func() {
+		close(r.closeCh)
+	})
 }
 
 // Name returns the name of the rotator

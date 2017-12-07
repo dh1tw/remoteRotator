@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	b64 "encoding/base64"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -23,38 +21,44 @@ import (
 	// _ "net/http/pprof"
 )
 
-var tcpServerCmd = &cobra.Command{
+var lanServerCmd = &cobra.Command{
 	Use:   "tcp",
-	Short: "expose a rotator to the network",
-	Long:  `expose a rotator to the network`,
-	Run:   tcpServer,
+	Short: "expose a rotator on the local network",
+	Long: `the local lan server allows you to expose a remoteRotator to a 
+local area network. By default, the rotator will only be listening on the loopback
+adapter. In order to make it available and discoverable on the local
+network, a network exposed adapter has to be selected. 
+
+remoteRotator supports access via TCP, emulating the Yaesu GS232 protocol
+and through a web interface (HTTP + Websocket).`,
+	Run: lanServer,
 }
 
 func init() {
-	serverCmd.AddCommand(tcpServerCmd)
+	serverCmd.AddCommand(lanServerCmd)
 
-	tcpServerCmd.Flags().BoolP("tcp-enabled", "", true, "enable TCP Server")
-	tcpServerCmd.Flags().StringP("tcp-host", "u", "127.0.0.1", "Host (use '0.0.0.0' to listen on all network adapters)")
-	tcpServerCmd.Flags().IntP("tcp-port", "p", 7373, "TCP Port")
-	tcpServerCmd.Flags().BoolP("http-enabled", "", true, "enable HTTP Server")
-	tcpServerCmd.Flags().StringP("http-host", "w", "127.0.0.1", "Host (use '0.0.0.0' to listen on all network adapters)")
-	tcpServerCmd.Flags().IntP("http-port", "k", 7070, "Port for the HTTP access to the rotator")
-	tcpServerCmd.Flags().BoolP("discovery-enabled", "", true, "make rotator discoverable on the network")
-	tcpServerCmd.Flags().StringP("portname", "P", "/dev/ttyACM0", "portname / path to the rotator (e.g. COM1)")
-	tcpServerCmd.Flags().IntP("baudrate", "b", 9600, "baudrate")
-	tcpServerCmd.Flags().StringP("type", "t", "yaesu", "Rotator type (supported: yaesu, dummy")
-	tcpServerCmd.Flags().StringP("name", "n", "myRotator", "Name tag for the rotator")
-	tcpServerCmd.Flags().BoolP("has-azimuth", "", true, "rotator supports Azimuth")
-	tcpServerCmd.Flags().BoolP("has-elevation", "", false, "rotator supports Elevation")
-	tcpServerCmd.Flags().DurationP("pollingrate", "", time.Second*1, "rotator polling rate")
-	tcpServerCmd.Flags().IntP("azimuth-min", "", 0, "metadata: minimum azimuth (in deg)")
-	tcpServerCmd.Flags().IntP("azimuth-max", "", 360, "metadata: maximum azimuth (in deg)")
-	tcpServerCmd.Flags().IntP("azimuth-stop", "", 0, "metadata: mechanical azimuth stop (in deg)")
-	tcpServerCmd.Flags().IntP("elevation-min", "", 0, "metadata: minimum elevation (in deg)")
-	tcpServerCmd.Flags().IntP("elevation-max", "", 180, "metadata: maximum elevation (in deg)")
+	lanServerCmd.Flags().BoolP("tcp-enabled", "", true, "enable TCP Server")
+	lanServerCmd.Flags().StringP("tcp-host", "u", "127.0.0.1", "Host (use '0.0.0.0' to listen on all network adapters)")
+	lanServerCmd.Flags().IntP("tcp-port", "p", 7373, "TCP Port")
+	lanServerCmd.Flags().BoolP("http-enabled", "", true, "enable HTTP Server")
+	lanServerCmd.Flags().StringP("http-host", "w", "127.0.0.1", "Host (use '0.0.0.0' to listen on all network adapters)")
+	lanServerCmd.Flags().IntP("http-port", "k", 7070, "Port for the HTTP access to the rotator")
+	lanServerCmd.Flags().BoolP("discovery-enabled", "", true, "make rotator discoverable on the network")
+	lanServerCmd.Flags().StringP("portname", "P", "/dev/ttyACM0", "portname / path to the rotator (e.g. COM1)")
+	lanServerCmd.Flags().IntP("baudrate", "b", 9600, "baudrate")
+	lanServerCmd.Flags().StringP("type", "t", "yaesu", "Rotator type (supported: yaesu, dummy")
+	lanServerCmd.Flags().StringP("name", "n", "myRotator", "Name tag for the rotator")
+	lanServerCmd.Flags().BoolP("has-azimuth", "", true, "rotator supports Azimuth")
+	lanServerCmd.Flags().BoolP("has-elevation", "", false, "rotator supports Elevation")
+	lanServerCmd.Flags().DurationP("pollingrate", "", time.Second*1, "rotator polling rate")
+	lanServerCmd.Flags().IntP("azimuth-min", "", 0, "metadata: minimum azimuth (in deg)")
+	lanServerCmd.Flags().IntP("azimuth-max", "", 360, "metadata: maximum azimuth (in deg)")
+	lanServerCmd.Flags().IntP("azimuth-stop", "", 0, "metadata: mechanical azimuth stop (in deg)")
+	lanServerCmd.Flags().IntP("elevation-min", "", 0, "metadata: minimum elevation (in deg)")
+	lanServerCmd.Flags().IntP("elevation-max", "", 180, "metadata: maximum elevation (in deg)")
 }
 
-func tcpServer(cmd *cobra.Command, args []string) {
+func lanServer(cmd *cobra.Command, args []string) {
 
 	// Try to read config file
 	if err := viper.ReadInConfig(); err == nil {
@@ -136,13 +140,6 @@ func tcpServer(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	// check if values from config file / pflags are valid
-	// if !checkParameterValues() {
-	// --> tcp & http host must be valid hostnames -> catch panic & exit gracefully
-
-	// 	os.Exit(-1)
-	// }
-
 	// go func() {
 	// 	log.Println(http.ListenAndServe("0.0.0.0:6060", http.DefaultServeMux))
 	// }()
@@ -168,7 +165,8 @@ func tcpServer(cmd *cobra.Command, args []string) {
 	h := &hub.Hub{}
 
 	rotatorError := make(chan struct{})
-	rotatorShutdown := make(chan struct{})
+
+	var r rotator.Rotator
 
 	switch strings.ToUpper(viper.GetString("rotator.type")) {
 
@@ -185,20 +183,17 @@ func tcpServer(cmd *cobra.Command, args []string) {
 		elMin := yaesu.ElevationMin(viper.GetInt("rotator.elevation-min"))
 		elMax := yaesu.ElevationMax(viper.GetInt("rotator.elevation-max"))
 		azStop := yaesu.AzimuthStop(viper.GetInt("rotator.azimuth-stop"))
+		errorCh := yaesu.ErrorCh(rotatorError)
 
 		yaesu, err := yaesu.NewYaesu(name, interval, evHandler,
 			spPortName, baudrate, hasAzimuth, hasElevation, azMin, azMax, elMin,
-			elMax, azStop)
+			elMax, azStop, errorCh)
 		if err != nil {
 			fmt.Println("unable to initialize YAESU rotator:", err)
 			os.Exit(1)
 		}
-		h, err = hub.NewHub(yaesu)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-		yaesu.Start(rotatorError, rotatorShutdown)
+		r = yaesu
+		// yaesu.Start(rotatorError)
 
 	case "DUMMY":
 		evHandler := dummy.EventHandler(yaesuEventHandler)
@@ -216,16 +211,18 @@ func tcpServer(cmd *cobra.Command, args []string) {
 			fmt.Println("unable to initialize Dummy rotator:", err)
 			os.Exit(1)
 		}
-		h, err = hub.NewHub(dummyRotator)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
 
-		dummyRotator.Start(rotatorShutdown)
+		r = dummyRotator
+		// dummyRotator.Start(rotatorShutdown)
 
 	default:
 		log.Printf("unknown rotator type (%v)\n", viper.GetString("rotator.type"))
+		os.Exit(1)
+	}
+
+	h, err := hub.NewHub(r)
+	if err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 
@@ -243,7 +240,6 @@ func tcpServer(cmd *cobra.Command, args []string) {
 		go h.ListenHTTP(viper.GetString("http.host"), viper.GetInt("http.port"), wsError)
 	}
 
-	// shutdownWg := sync.WaitGroup{}
 	// start mDNS server
 	mDNSShutdown := make(chan struct{})
 
@@ -263,7 +259,7 @@ func tcpServer(cmd *cobra.Command, args []string) {
 		select {
 		case sig := <-osSignals:
 			if sig == os.Interrupt {
-				close(rotatorShutdown)
+				r.Close()
 				close(mDNSShutdown)
 				return
 			}
@@ -310,16 +306,6 @@ func startMdnsServer(shutdown <-chan struct{}) error {
 	}()
 
 	return nil
-}
-
-func encodeInfo(i rotator.Info) (string, error) {
-	res, err := json.Marshal(i)
-	if err != nil {
-		return "", err
-	}
-
-	uEnc := b64.URLEncoding.EncodeToString(res)
-	return uEnc, nil
 }
 
 // Get preferred outbound ip of this machine
