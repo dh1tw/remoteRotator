@@ -290,7 +290,7 @@ func startMdnsServer(shutdown <-chan struct{}) error {
 
 	go func() {
 		mDNSService, err := mdns.NewMDNSService(viper.GetString("rotator.name"),
-			"_rotators._shackbus._tcp", "", "", viper.GetInt("http.port"),
+			"_rotators._tcp", "", "", viper.GetInt("http.port"),
 			[]net.IP{getOutboundIP()}, nil)
 
 		if err != nil {

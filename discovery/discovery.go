@@ -67,17 +67,17 @@ func LookupRotators() ([]RotatorMdnsEntry, error) {
 		for entry := range entriesCh {
 
 			// ignore if not rotators.shackbus.local
-			if !strings.Contains(entry.Name, "_rotators._shackbus._tcp.local") {
+			if !strings.Contains(entry.Name, "_rotators._tcp.local") {
 				continue
 			}
 
-			name := strings.TrimSuffix(entry.Name, "._rotators._shackbus._tcp.local.")
+			name := strings.TrimSuffix(entry.Name, "._rotators._tcp.local.")
 			// replace '\' (escaping backslashes)
 			name = strings.Replace(name, "\x5c", "", -1)
 
 			r := RotatorMdnsEntry{
 				Name:   name,
-				URL:    strings.TrimSuffix(entry.Name, "."),
+				URL:    entry.Name,
 				Host:   strings.TrimSuffix(entry.Host, "."),
 				AddrV4: entry.AddrV4,
 				AddrV6: entry.AddrV6,
@@ -107,7 +107,7 @@ func LookupRotators() ([]RotatorMdnsEntry, error) {
 	// 	}
 	// }
 
-	mdns.Lookup("_rotators._shackbus._tcp", entriesCh)
+	mdns.Lookup("_rotators._tcp", entriesCh)
 
 	close(entriesCh)
 	return rotators, nil
