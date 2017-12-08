@@ -28,6 +28,7 @@ has been reached.
 - TCP
 - HTTP
 - Websockets
+- MQTT / NATS (no yet supported)
 
 ## License
 
@@ -55,33 +56,51 @@ All parameters can be set either in a config file (see below) or through pflags.
 To get a list of supported flags for the tcp server, execute:
 
 ```bash
-$ remoteRotator server tcp --help
-```
+$ remoteRotator server lan --help
 
-```
-expose a rotator to the network
+The local lan server allows you to expose a rotator to a local area network.
+By default, the rotator will only be listening on the loopback adapter. In
+order to make it available and discoverable on the local network, a network
+connected adapter has to be selected.
+
+remoteRotator supports access via TCP, emulating the Yaesu GS232 protocol
+(disabled by default) and through a web interface (HTTP + Websocket).
+
+You can select the following rotator types:
+1. Yaesu (GS232 compatible)
+2. Dummy (great for testing)
+
+remoteRotator allows to assign a series of meta data to a rotator:
+1. Name
+2. Azimuth/Elevation minimum value
+3. Azimuth/Elevation maximum value
+4. Azimuth Mechanical stop
+
+These metadata enhance the rotators view (e.g. showing overlap) in the web
+interface and can also help to limit for example the rotators range if it does
+not support full 360°.
 
 Usage:
-  remoteRotator server tcp [flags]
+  remoteRotator server lan [flags]
 
 Flags:
-      --azimuth-max int        metadata: maximum azimuth (in deg) (default 450)
+      --azimuth-max int        metadata: maximum azimuth (in deg) (default 360)
       --azimuth-min int        metadata: minimum azimuth (in deg)
       --azimuth-stop int       metadata: mechanical azimuth stop (in deg)
   -b, --baudrate int           baudrate (default 9600)
       --discovery-enabled      make rotator discoverable on the network (default true)
       --elevation-max int      metadata: maximum elevation (in deg) (default 180)
       --elevation-min int      metadata: minimum elevation (in deg)
-      --has-azimuth            Indicate if the rotator supports Azimuth (default true)
-      --has-elevation          Indicate if the rotator supports Elevation
-  -h, --help                   help for tcp
+      --has-azimuth            rotator supports Azimuth (default true)
+      --has-elevation          rotator supports Elevation
+  -h, --help                   help for lan
       --http-enabled           enable HTTP Server (default true)
   -w, --http-host string       Host (use '0.0.0.0' to listen on all network adapters) (default "127.0.0.1")
   -k, --http-port int          Port for the HTTP access to the rotator (default 7070)
   -n, --name string            Name tag for the rotator (default "myRotator")
       --pollingrate duration   rotator polling rate (default 1s)
   -P, --portname string        portname / path to the rotator (e.g. COM1) (default "/dev/ttyACM0")
-      --tcp-enabled            enable TCP Server (default true)
+      --tcp-enabled            enable TCP Server
   -u, --tcp-host string        Host (use '0.0.0.0' to listen on all network adapters) (default "127.0.0.1")
   -p, --tcp-port int           TCP Port (default 7373)
   -t, --type string            Rotator type (supported: yaesu, dummy (default "yaesu")
@@ -91,35 +110,39 @@ Global Flags:
 ```
 
 So in order to launch remoteRotator on Windows with a Yaesu rotator connected at
-COM3 and having the server listening on the network port 5050, we would call:
+COM3 an having the web HTTP server listening on your local network, we would call:
 
 ```bash
-$ remoteRotator server tcp -u "0.0.0.0" -p 5050 -P "COM3"
-```
+$ remoteRotator.exe server lan -w "0.0.0.0" -P "COM3" -t yaesu
 
-```
 no config file found
-Listening on 0.0.0.0:5050 for TCP connections
-Listening on 0.0.0.0:7070 for HTTP connections
-
+2017/12/08 16:50:25 added rotator (myRotator)
+2017/12/08 16:50:25 Listening on 0.0.0.0:7070 for HTTP connections
 ```
-
-remoteRotator allows to set a few useful metadata:
-
-- azimuth/elevation min/max
-- mechanical stop
 
 ## Connecting via TCP / Telnet
 
 If you have an application (e.g. [arsvcom](https://ea4tx.com/en/arsvcom/) or
 [pstrotator](http://www.qsl.net/yo3dmu/index_Page346.htm)) which can talk to
-a Yaesu compatible rotator, you can point that application to the selected
-TCP port.
+a Yaesu compatible rotator, you can point that application to remoteRotator's
+builtin TCP server (although disabled by default).
 
-You can also connect directly via telnet:
+Start remoteRotator:
+
+``` bash
+$ ./remoteRotator -t dummy --tcp-enabled
+
+no config file found
+2017/12/08 16:50:25 added rotator (myRotator)
+2017/12/08 16:50:25 listening on 127.0.0.1:7070 for HTTP connections
+2017/12/08 16:50:25 listening on 127.0.0.1:7373 for TCP connections
+2017/12/08 16:50:25 discovery disabled; the HTTP server must listen on an accessible network interface (e.g. 0.0.0.0)
+```
+
+For testing, we connect directly via telnet:
 
 ```
-$ telnet localhost 5050
+$ telnet localhost 7373
 Trying ::1...
 Connected to localhost.
 Escape character is '^]'.
@@ -149,28 +172,28 @@ You can specify the host and port in the settings above, or deactivate the
 built-in webserver if you don't need it.
 
 The red arrow indicates the heading of the rotator and the yellow arrow
-indicates the preset value to which the rotator will turn to.
+indicates the preset value to which the rotator will turn to. The yellow arrow
+disappears when the desired direction has been reached.
 
 The dotted red line indicates the mechanical stop of the rotator.
-The green arc segment indicates a limited turning radius for this rotator.
-The blue arc segment indicates the mechanical overlap supported by this rotator.
+A green arc segment indicates a limited turning radius for this rotator.
+A blue arc segment indicates the mechanical overlap supported by this rotator.
 
 ## Web Interface (Aggregator)
 
 ![Alt text](https://i.imgur.com/lcHhslZ.png "remoteRotator WebUI")
 
-If you have multiple rotators, you might want to use the dedicated web server.
-The following example starts the webserver on port 6005 and listens on all
-network interfaces.
+If you have multiple rotators, you might want to use the dedicated aggregation
+web server. The following example starts the webserver on port 6005 and listens 
+on all network interfaces.
 
 ```
 $ remoteRotator web -w "0.0.0.0" -k 6005 
 ```
 
 The Webserver automatically discovers the available remoteRotator instances
-in your local network and adds them (or removes them) from the web interface.
-Technically the discovery process is based on mDNS and doesn't require any
-configuration.
+in your local network and adds them from the web interface. Technically the 
+discovery process is based on mDNS and doesn't require any configuration.
 
 ## Config file
 
