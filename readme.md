@@ -9,7 +9,7 @@
 ![Alt text](https://i.imgur.com/lcHhslZ.png "remoteRotator WebUI")
 
 remoteRotator is a cross platform application which makes your azimuth / elevation
-antenna rotators available on the network and accessible through a web interface.
+antenna rotators available on the network.
 
 remoteRotator is written in the programing language [Go](https://golang.org).
 
@@ -28,7 +28,7 @@ has been reached.
 - TCP
 - HTTP
 - Websockets
-- MQTT / NATS (no yet supported)
+- MQTT / NATS (coming soon)
 
 ## License
 
@@ -48,16 +48,45 @@ time. There are no runtime dependencies.
 
 ## Getting started
 
-Identify the serial port to which your rotator is connected. On Windows
-this will be something like COMx (e.g. COM3), on Linux / MacOS it will be
-a device in the `/dev/` folder (e.g. /dev/ttyACM0).
+remoteRotator provides a series of nested commands and flags.
+
+````bash
+$ ./remoteRotator
+````
+
+````
+Network interface for Rotators
+
+Usage:
+  remoteRotator [command]
+
+Available Commands:
+  enumerate   discover and list all available rotators on the network
+  help        Help about any command
+  server      remoteRotator Server
+  version     Print the version number of remoteRotator
+  web         webserver providing access to all rotators on the network
+
+Flags:
+      --config string   config file (default is $HOME/.remoteRotator.yaml)
+  -h, --help            help for remoteRotator
+
+Use "remoteRotator [command] --help" for more information about a command.
+````
+
+So let's fire up a remoteRotator server for your rotator: 
+First, identify the serial port to which your rotator is connected. On Windows
+this will be something like `COMx` (e.g. `COM3`), on Linux / MacOS it will be
+a device in the `/dev/` folder (e.g. `/dev/ttyACM0`).
 
 All parameters can be set either in a config file (see below) or through pflags.
-To get a list of supported flags for the tcp server, execute:
+To get a list of supported flags for the lan server, execute:
 
-```bash
+```
 $ remoteRotator server lan --help
+```
 
+```
 The local lan server allows you to expose a rotator to a local area network.
 By default, the rotator will only be listening on the loopback adapter. In
 order to make it available and discoverable on the local network, a network
@@ -114,7 +143,9 @@ COM3 an having the web HTTP server listening on your local network, we would cal
 
 ```bash
 $ remoteRotator.exe server lan -w "0.0.0.0" -P "COM3" -t yaesu
+```
 
+```
 no config file found
 2017/12/08 16:50:25 added rotator (myRotator)
 2017/12/08 16:50:25 Listening on 0.0.0.0:7070 for HTTP connections
@@ -129,15 +160,17 @@ builtin TCP server (although disabled by default).
 
 Start remoteRotator:
 
-``` bash
+```` bash
 $ ./remoteRotator -t dummy --tcp-enabled
+````
 
+````
 no config file found
 2017/12/08 16:50:25 added rotator (myRotator)
 2017/12/08 16:50:25 listening on 127.0.0.1:7070 for HTTP connections
 2017/12/08 16:50:25 listening on 127.0.0.1:7373 for TCP connections
 2017/12/08 16:50:25 discovery disabled; the HTTP server must listen on an accessible network interface (e.g. 0.0.0.0)
-```
+````
 
 For testing, we connect directly via telnet:
 
@@ -187,9 +220,9 @@ If you have multiple rotators, you might want to use the dedicated aggregation
 web server. The following example starts the webserver on port 6005 and listens 
 on all network interfaces.
 
-```
+````
 $ remoteRotator web -w "0.0.0.0" -k 6005 
-```
+````
 
 The Webserver automatically discovers the available remoteRotator instances
 in your local network and adds them from the web interface. Technically the 
@@ -236,14 +269,14 @@ the proper behaviour.
 If you file a bug report, please include always the version of remoteRotator
 you are running:
 
-``` bash
-$ remoteRotator version
-```
+```` bash
+$ remoteRotator.exe version
+````
 
-```
+````
 copyright Tobias Wellnitz, DH1TW, 2017
 remoteRotator Version: 0.1.0, darwin/amd64, BuildDate: 2017-09-04T00:58:00+02:00, Commit: 338ff13
-```
+````
 
 ## Documentation
 
