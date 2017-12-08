@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/mdns"
+	"github.com/micro/mdns"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -290,7 +290,7 @@ func startMdnsServer(shutdown <-chan struct{}) error {
 
 	go func() {
 		mDNSService, err := mdns.NewMDNSService(viper.GetString("rotator.name"),
-			"_rotators._tcp", "", "", viper.GetInt("http.port"),
+			"_rotator._tcp", "", "", viper.GetInt("http.port"),
 			[]net.IP{getOutboundIP()}, nil)
 
 		if err != nil {
@@ -298,7 +298,11 @@ func startMdnsServer(shutdown <-chan struct{}) error {
 			return
 		}
 
-		mDNSServer, _ := mdns.NewServer(&mdns.Config{Zone: mDNSService})
+		mDNSServer, err := mdns.NewServer(&mdns.Config{Zone: mDNSService})
+		if err != nil {
+			log.Printf("discovery disabled; unable to start mDNS service: %s\n", err)
+			return
+		}
 		defer mDNSServer.Shutdown()
 		<-shutdown
 	}()
