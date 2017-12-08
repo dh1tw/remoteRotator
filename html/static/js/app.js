@@ -272,5 +272,11 @@ var vm = new Vue({
             });
             return ordered;
         },
+        loading: function() {
+            if (Object.keys(this.rotators).length == 0){
+                return false;
+            }
+            return true;
+        }
     }
 });
