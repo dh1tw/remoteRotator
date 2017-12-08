@@ -116,7 +116,7 @@ func (w *webserver) update() {
 			eh := proxy.EventHandler(ev)
 			r, err := proxy.New(done, host, port, eh)
 			if err != nil {
-				log.Println(err)
+				log.Println("unable to create proxy object:", err)
 				continue
 			}
 			if err := w.AddRotator(r); err != nil {
