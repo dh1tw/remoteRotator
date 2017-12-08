@@ -38,8 +38,10 @@ type Yaesu struct {
 	sp              io.ReadWriteCloser
 	spPortName      string
 	spBaudrate      int
+	closeCh         chan struct{}
+	errorCh         chan struct{}
 	starter         sync.Once
-	spCloser        sync.Once
+	closer          sync.Once
 	headingPattern  *regexp.Regexp
 	watchdogTs      time.Time
 }
@@ -131,6 +133,14 @@ func ElevationMax(max int) func(*Yaesu) {
 	}
 }
 
+// ErrorCh is a functional option allows you to pass a channel to the rotator.
+// The channel will be closed when an internal error occures.
+func ErrorCh(ch chan struct{}) func(*Yaesu) {
+	return func(r *Yaesu) {
+		r.errorCh = ch
+	}
+}
+
 // NewYaesu creates a new Yaesu object which satisfies implicitely the
 // rotator.Rotator interface. Configuration settings are set through functional
 // options. The the Yaesu can not be initialized nil and the corresponding error
@@ -140,7 +150,7 @@ func ElevationMax(max int) func(*Yaesu) {
 // portname: /dev/ttyACM0,
 // pollingInterval: 5sec,
 // baudrate: 9600.
-func NewYaesu(opts ...func(*Yaesu)) (*Yaesu, error) {
+func New(opts ...func(*Yaesu)) (*Yaesu, error) {
 
 	// regex Pattern [0-9]{4} -> 0310..etc
 	headingPattern, err := regexp.Compile("[\\d]{4}")
@@ -178,17 +188,23 @@ func NewYaesu(opts ...func(*Yaesu)) (*Yaesu, error) {
 
 	r.sp = sp
 
+	go r.start()
+
 	return r, nil
 }
 
-func (r *Yaesu) close() {
+// Close shutdowns the rotator object and prepares it for garbage collection
+func (r *Yaesu) Close() {
 	r.Lock()
 	defer r.Unlock()
 	if r.pollingTicker != nil {
 		r.pollingTicker.Stop()
 	}
-	// makes sure that the serial port just gets closed once
-	r.spCloser.Do(func() { r.sp.Close() })
+	// makes sure that the serial port and the event loop just gets closed once
+	r.closer.Do(func() {
+		close(r.closeCh)
+		r.sp.Close()
+	})
 }
 
 // resetWatchdog resets the watchdog. This means that a packet has been
@@ -214,17 +230,11 @@ func (r *Yaesu) checkWatchdog() bool {
 // It will query the Yaesu rotator for the current heading (azimuth + elevation)
 // with the pollingrate defined during initialization.
 // A watchdog detects if the Yaesu rotator does not respond anymore.
-// If an error occures, the communication will be shut down and the
-// yaesuError channel will be closed.
-func (r *Yaesu) Start(yaesuError chan<- struct{}, shutdown <-chan struct{}) {
-	r.starter.Do(func() {
-		go r.start(yaesuError, shutdown)
-	})
-}
-
-func (r *Yaesu) start(yaesuError chan<- struct{}, shutdown <-chan struct{}) {
-	defer close(yaesuError)
-	defer r.close()
+// If an error occures, the errorCh will be closed.
+// Consequently the communication will be shut down and the object
+// prepared for garbage collection.
+func (r *Yaesu) start() {
+	defer r.Close()
 
 	r.Lock()
 	r.pollingTicker = time.NewTicker(r.pollingInterval)
@@ -237,13 +247,15 @@ func (r *Yaesu) start(yaesuError chan<- struct{}, shutdown <-chan struct{}) {
 			// fmt.Println("tick")
 			if err := r.query(); err != nil {
 				fmt.Println("serial port write error:", err)
+				close(r.errorCh)
 				return
 			}
 			if r.checkWatchdog() {
 				fmt.Println("communication lost with Yaesu rotator")
+				close(r.errorCh)
 				return
 			}
-		case <-shutdown:
+		case <-r.closeCh:
 			return
 		default:
 			// pass
@@ -257,6 +269,7 @@ func (r *Yaesu) start(yaesuError chan<- struct{}, shutdown <-chan struct{}) {
 			}
 			fmt.Printf("serial port read error (%s on %s): %s\n",
 				r.name, r.spPortName, err)
+			close(r.errorCh)
 			return // exit
 		}
 		r.resetWatchdog()

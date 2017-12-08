@@ -459,7 +459,7 @@ func TestNewYaesuPortNotExist(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := NewYaesu(tc.portName)
+			_, err := New(tc.portName)
 			if err.Error() != tc.expError {
 				if err.Error() != tc.altError {
 					t.Fatalf("expected error '%s', got '%s'", tc.expError, err.Error())

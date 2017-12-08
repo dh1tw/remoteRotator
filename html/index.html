@@ -14,6 +14,10 @@
 
 <body>
   <div id="app">
+    <div id="loading" v-bind:class="{'hidden': loading}">
+        <i class="fa fa-spinner fa-spin spinner" aria-hidden="true"></i>
+        <p> Searching for rotators...</p>
+    </div>
     <div class="main-rotator" v-if="Object.keys(sortedAzRotators).length > 0">
       <div id="azimuth-rotator">
         <rotator-name :name="selectedAzRotator.name" :is-azimuth="true" :width="canvasSize"></rotator-name>

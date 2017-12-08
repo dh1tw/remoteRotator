@@ -78,7 +78,7 @@ func (hub *Hub) addRotator(r rotator.Rotator) error {
 	if err := hub.broadcastToWsClients(ev); err != nil {
 		fmt.Println(err)
 	}
-	log.Printf("adding rotator (%s)\n", r.Name())
+	log.Printf("added rotator (%s)\n", r.Name())
 
 	return nil
 }
@@ -98,8 +98,8 @@ func (hub *Hub) RemoveRotator(r rotator.Rotator) {
 	}
 
 	delete(hub.rotators, r.Name())
-	// TBD: Make sure rotator gets destroyed !!!!! (eg websocket closed, etc)
-	log.Printf("removing rotator (%s)\n", r.Name())
+	r.Close()
+	log.Printf("removed rotator (%s)\n", r.Name())
 }
 
 // HasRotator returns a bool if a given rotator is already registered.

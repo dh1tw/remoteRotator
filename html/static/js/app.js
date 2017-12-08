@@ -90,7 +90,7 @@ var vm = new Vue({
                 if (Object.keys(this.elRotators).length > 0) {
                     if (this.selectedElRotator.name == rotator.name) {
                         // pick the first one in the list
-                        var nextRot = Object.keys(this.azRotators)[0];
+                        var nextRot = Object.keys(this.elRotators)[0];
                         this.selectedElRotator = this.elRotators[nextRot];
                     }
                 } else {
@@ -272,5 +272,11 @@ var vm = new Vue({
             });
             return ordered;
         },
+        loading: function() {
+            if (Object.keys(this.rotators).length == 0){
+                return false;
+            }
+            return true;
+        }
     }
 });

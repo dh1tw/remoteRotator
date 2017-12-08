@@ -97,7 +97,11 @@ var ev = func(r rotator.Rotator, ev rotator.Event, value ...interface{}) {
 
 func (w *webserver) update() {
 
-	dsvrdRotators := discovery.LookupRotators()
+	dsvrdRotators, err := discovery.LookupRotators()
+	if err != nil {
+		log.Println(err)
+		return
+	}
 
 	// check if rotator(s) are not registered yet
 	for _, dr := range dsvrdRotators {
@@ -105,13 +109,15 @@ func (w *webserver) update() {
 		// if the rotator is new, then add it
 		if !w.HasRotator(dr.Name) {
 
-			done := make(chan struct{})
+			doneCh := make(chan struct{})
+			done := proxy.DoneCh(doneCh)
 			host := proxy.Host(dr.AddrV4.String())
 			port := proxy.Port(dr.Port)
 			eh := proxy.EventHandler(ev)
 			r, err := proxy.New(done, host, port, eh)
 			if err != nil {
-				log.Println(err)
+				log.Println("unable to create proxy object:", err)
+				r = nil
 				continue
 			}
 			if err := w.AddRotator(r); err != nil {
@@ -119,22 +125,9 @@ func (w *webserver) update() {
 				continue
 			}
 			go func() {
-				<-done
+				<-doneCh
 				w.RemoveRotator(r)
 			}()
-		}
-	}
-
-	// check if a rotator has to be removed
-	for _, r := range w.Rotators() {
-		found := false
-		for _, dr := range dsvrdRotators {
-			if dr.Name == r.Name() {
-				found = true
-			}
-		}
-		if !found {
-			w.RemoveRotator(r)
 		}
 	}
 }
