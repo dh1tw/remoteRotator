@@ -22,7 +22,7 @@ import (
 )
 
 var lanServerCmd = &cobra.Command{
-	Use:   "tcp",
+	Use:   "lan",
 	Short: "expose a rotator on the local network",
 	Long: `the local lan server allows you to expose a remoteRotator to a 
 local area network. By default, the rotator will only be listening on the loopback
