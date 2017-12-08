@@ -23,21 +23,38 @@ import (
 
 var lanServerCmd = &cobra.Command{
 	Use:   "lan",
-	Short: "expose a rotator on the local network",
-	Long: `the local lan server allows you to expose a remoteRotator to a 
-local area network. By default, the rotator will only be listening on the loopback
-adapter. In order to make it available and discoverable on the local
-network, a network exposed adapter has to be selected. 
+	Short: "expose a rotator on your local network",
+	Long: `
+The local lan server allows you to expose a rotator to a local area network. 
+By default, the rotator will only be listening on the loopback adapter. In 
+order to make it available and discoverable on the local network, a network 
+connected adapter has to be selected. 
 
 remoteRotator supports access via TCP, emulating the Yaesu GS232 protocol
-and through a web interface (HTTP + Websocket).`,
+(disabled by default) and through a web interface (HTTP + Websocket).
+
+You can select the following rotator types: 
+1. Yaesu (GS232 compatible)
+2. Dummy (great for testing)
+
+remoteRotator allows to assign a series of meta data to a rotator:
+1. Name
+2. Azimuth/Elevation minimum value
+3. Azimuth/Elevation maximum value
+4. Azimuth Mechanical stop
+
+These metadata enhance the rotators view (e.g. showing overlap) in the web 
+interface and can also help to limit for example the rotators range if it does 
+not support full 360°.
+
+`,
 	Run: lanServer,
 }
 
 func init() {
 	serverCmd.AddCommand(lanServerCmd)
 
-	lanServerCmd.Flags().BoolP("tcp-enabled", "", true, "enable TCP Server")
+	lanServerCmd.Flags().BoolP("tcp-enabled", "", false, "enable TCP Server")
 	lanServerCmd.Flags().StringP("tcp-host", "u", "127.0.0.1", "Host (use '0.0.0.0' to listen on all network adapters)")
 	lanServerCmd.Flags().IntP("tcp-port", "p", 7373, "TCP Port")
 	lanServerCmd.Flags().BoolP("http-enabled", "", true, "enable HTTP Server")
