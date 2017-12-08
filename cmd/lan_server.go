@@ -310,7 +310,8 @@ func startMdnsServer(shutdown <-chan struct{}) error {
 func getOutboundIP() net.IP {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
-		log.Fatal(err)
+		log.Println("No network adapter detected; Using Loopback only")
+		return net.IPv4(127, 0, 0, 1)
 	}
 	defer conn.Close()
 
