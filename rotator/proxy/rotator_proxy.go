@@ -137,8 +137,9 @@ func New(opts ...func(*Proxy)) (*Proxy, error) {
 		for {
 			_, msg, err := conn.ReadMessage()
 			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseAbnormalClosure) ||
-					websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure) {
+				if websocket.IsUnexpectedCloseError(err,
+					websocket.CloseAbnormalClosure,
+					websocket.CloseNormalClosure) {
 					log.Println("websocket error:", err)
 				}
 				close(r.doneCh)
