@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -13,6 +12,17 @@ import (
 
 	"github.com/dh1tw/remoteRotator/hub"
 	"github.com/dh1tw/remoteRotator/rotator"
+)
+
+const (
+	// Time allowed to write a message to the peer.
+	wsWriteWait = 5 * time.Second
+
+	// Time allowed to read the next pong message from the peer.
+	wsPongWait = 10 * time.Second
+
+	// Send pings to peer with this period. Must be less than pongWait.
+	wsPingPeriod = 3 * time.Second
 )
 
 // Proxy is a proxy object representing a remote rotator. It implements
@@ -23,6 +33,9 @@ type Proxy struct {
 	host           string
 	port           int
 	conn           *websocket.Conn
+	wsWriteMutex   sync.Mutex
+	wsTxTimeout    time.Duration
+	wsRxTimeout    time.Duration
 	eventHandler   func(rotator.Rotator, rotator.Event, ...interface{})
 	name           string
 	azimuthMin     int
@@ -95,14 +108,38 @@ func New(opts ...func(*Proxy)) (*Proxy, error) {
 		return nil, err
 	}
 
+	conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(wsPongWait))
+		return nil
+	})
+
 	r.conn = conn
+
+	go func() {
+		ping := time.NewTicker(wsPingPeriod)
+		for {
+			select {
+			case <-ping.C:
+				r.wsWriteMutex.Lock()
+				r.conn.SetWriteDeadline(time.Now().Add(wsWriteWait))
+				if err := r.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+					// log.Println(err)
+					r.wsWriteMutex.Unlock()
+					return
+				}
+				r.wsWriteMutex.Unlock()
+			}
+		}
+	}()
 
 	go func() {
 		for {
 			_, msg, err := conn.ReadMessage()
 			if err != nil {
-				if !strings.Contains(err.Error(), "EOF") {
-					log.Println("disconnecting:", err)
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseAbnormalClosure) ||
+					websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure) {
+					log.Println("websocket error:", err)
 				}
 				close(r.doneCh)
 				return
@@ -155,9 +192,7 @@ func New(opts ...func(*Proxy)) (*Proxy, error) {
 
 func (r *Proxy) Close() {
 	if r.conn != nil {
-		if err := r.conn.Close(); err != nil {
-			log.Println(err)
-		}
+		r.conn.Close()
 	}
 }
 
@@ -198,6 +233,8 @@ func (r *Proxy) getInfo() error {
 }
 
 func (r *Proxy) write(s rotator.Status) error {
+	r.wsWriteMutex.Lock()
+	defer r.wsWriteMutex.Unlock()
 	return r.conn.WriteJSON(s)
 }
 

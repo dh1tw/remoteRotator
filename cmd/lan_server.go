@@ -185,7 +185,7 @@ func lanServer(cmd *cobra.Command, args []string) {
 		azStop := yaesu.AzimuthStop(viper.GetInt("rotator.azimuth-stop"))
 		errorCh := yaesu.ErrorCh(rotatorError)
 
-		yaesu, err := yaesu.NewYaesu(name, interval, evHandler,
+		yaesu, err := yaesu.New(name, interval, evHandler,
 			spPortName, baudrate, hasAzimuth, hasElevation, azMin, azMax, elMin,
 			elMax, azStop, errorCh)
 		if err != nil {
@@ -193,7 +193,6 @@ func lanServer(cmd *cobra.Command, args []string) {
 			os.Exit(1)
 		}
 		r = yaesu
-		// yaesu.Start(rotatorError)
 
 	case "DUMMY":
 		evHandler := dummy.EventHandler(yaesuEventHandler)
@@ -206,14 +205,13 @@ func lanServer(cmd *cobra.Command, args []string) {
 		elMax := dummy.ElevationMax(viper.GetInt("rotator.elevation-max"))
 		azStop := dummy.AzimuthStop(viper.GetInt("rotator.azimuth-stop"))
 
-		dummyRotator, err := dummy.NewDummyRotator(name, evHandler, hasAzimuth, hasElevation, azMin, azMax, azStop, elMin, elMax)
+		dummyRotator, err := dummy.New(name, evHandler, hasAzimuth, hasElevation, azMin, azMax, azStop, elMin, elMax)
 		if err != nil {
 			fmt.Println("unable to initialize Dummy rotator:", err)
 			os.Exit(1)
 		}
 
 		r = dummyRotator
-		// dummyRotator.Start(rotatorShutdown)
 
 	default:
 		log.Printf("unknown rotator type (%v)\n", viper.GetString("rotator.type"))

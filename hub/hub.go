@@ -91,9 +91,6 @@ func (hub *Hub) RemoveRotator(r rotator.Rotator) {
 	ev := Event{
 		Name:    RemoveRotator,
 		Rotator: r.Info(),
-		// Rotator: rotator.Info{
-		// 	Name: r.Name(),
-		// },
 	}
 
 	if err := hub.broadcastToWsClients(ev); err != nil {
@@ -101,7 +98,7 @@ func (hub *Hub) RemoveRotator(r rotator.Rotator) {
 	}
 
 	delete(hub.rotators, r.Name())
-	// TBD: Make sure rotator gets destroyed !!!!! (eg websocket closed, etc)
+	r.Close()
 	log.Printf("removed rotator (%s)\n", r.Name())
 }
 

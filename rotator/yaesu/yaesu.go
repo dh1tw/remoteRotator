@@ -41,7 +41,7 @@ type Yaesu struct {
 	closeCh         chan struct{}
 	errorCh         chan struct{}
 	starter         sync.Once
-	spCloser        sync.Once
+	closer          sync.Once
 	headingPattern  *regexp.Regexp
 	watchdogTs      time.Time
 }
@@ -150,7 +150,7 @@ func ErrorCh(ch chan struct{}) func(*Yaesu) {
 // portname: /dev/ttyACM0,
 // pollingInterval: 5sec,
 // baudrate: 9600.
-func NewYaesu(opts ...func(*Yaesu)) (*Yaesu, error) {
+func New(opts ...func(*Yaesu)) (*Yaesu, error) {
 
 	// regex Pattern [0-9]{4} -> 0310..etc
 	headingPattern, err := regexp.Compile("[\\d]{4}")
@@ -200,10 +200,11 @@ func (r *Yaesu) Close() {
 	if r.pollingTicker != nil {
 		r.pollingTicker.Stop()
 	}
-	// shutdown the event loop
-	close(r.closeCh)
-	// makes sure that the serial port just gets closed once
-	r.spCloser.Do(func() { r.sp.Close() })
+	// makes sure that the serial port and the event loop just gets closed once
+	r.closer.Do(func() {
+		close(r.closeCh)
+		r.sp.Close()
+	})
 }
 
 // resetWatchdog resets the watchdog. This means that a packet has been

@@ -113,7 +113,7 @@ func EventHandler(h func(rotator.Rotator, rotator.Event, ...interface{})) func(*
 	}
 }
 
-// NewDummyRotator creates a new dummy rotator which satisfies the
+// New creates a new dummy rotator which satisfies the
 // rotator.Rotator interface. Options can be injected through functional
 // options. If the Dummy can not be initialized, nil and the corresponding error
 // will be returned.
@@ -123,7 +123,7 @@ func EventHandler(h func(rotator.Rotator, rotator.Event, ...interface{})) func(*
 // elevationMax: 180,
 // azSpeed: 8, (deg/sec)
 // elSpeed: 5, (deg/sec)
-func NewDummyRotator(options ...func(*Dummy)) (*Dummy, error) {
+func New(options ...func(*Dummy)) (*Dummy, error) {
 
 	r := &Dummy{
 		hasAzimuth:     true,

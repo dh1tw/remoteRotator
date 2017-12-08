@@ -69,6 +69,8 @@ func TestYaesuMassiveConcurrentCalls(t *testing.T) {
 		hasAzimuth:      true,
 		sp:              dp,
 		pollingInterval: time.Second * 2,
+		closeCh:         make(chan struct{}),
+		errorCh:         make(chan struct{}),
 	}
 
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -76,24 +78,21 @@ func TestYaesuMassiveConcurrentCalls(t *testing.T) {
 	d := time.Second * 5
 	wg := &sync.WaitGroup{}
 
-	yaesuError := make(chan struct{})
-	shutdown := make(chan struct{})
-
 	calls := &apiCallCounter{}
 
-	go yaesu.Start(yaesuError, shutdown)
+	go yaesu.start()
 	for i := 0; i < 1000; i++ {
 		go randomAccess(yaesu, d, calls, wg, t)
 		wg.Add(1)
 	}
 
 	select {
-	case <-yaesuError:
+	case <-yaesu.errorCh:
 		t.Errorf("unexpected error while reading from serial port")
 	default:
 	}
 	wg.Wait()
-	close(shutdown)
+	yaesu.Close()
 	time.Sleep(time.Second * 3)
 	fmt.Println("Concurrent stress test summary:")
 	fmt.Println(strings.Repeat("=", 30))
