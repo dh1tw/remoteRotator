@@ -38,8 +38,11 @@ remoteRotator is published under the permissive [MIT license](https://github.com
 
 You can download a tarball / zip archive with the compiled binary for MacOS
 (AMD64), Linux (386/AMD64/ARM) and Windows (386/AMD64) from the
-[releases](https://github.com/dh1tw/remoteRotator/releases) page. remoteRotator
-is just a single executable.
+[releases](https://github.com/dh1tw/remoteRotator/releases) page.
+
+remoteRotator works well on SoC boards like the Raspberry / Orange / Banana Pis.
+
+remoteRotator is just a single executable.
 
 ## Dependencies
 
@@ -74,7 +77,8 @@ Flags:
 Use "remoteRotator [command] --help" for more information about a command.
 ````
 
-So let's fire up a remoteRotator server for your rotator: 
+So let's fire up a remoteRotator server for your rotator:
+
 First, identify the serial port to which your rotator is connected. On Windows
 this will be something like `COMx` (e.g. `COM3`), on Linux / MacOS it will be
 a device in the `/dev/` folder (e.g. `/dev/ttyACM0`).
@@ -83,7 +87,7 @@ All parameters can be set either in a config file (see below) or through pflags.
 To get a list of supported flags for the lan server, execute:
 
 ```
-$ remoteRotator server lan --help
+$ ./remoteRotator server lan --help
 ```
 
 ```
