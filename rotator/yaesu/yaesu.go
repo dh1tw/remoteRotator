@@ -358,7 +358,7 @@ func (r *Yaesu) setValueAndCallEvent(ev rotator.Event, value int) {
 // Name returns the name of the rotator
 func (r *Yaesu) Name() string {
 	r.RLock()
-	defer r.Unlock()
+	defer r.RUnlock()
 	return r.name
 }
 
