@@ -5,12 +5,21 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/dh1tw/remoteRotator/discovery"
 	"github.com/dh1tw/remoteRotator/hub"
 	"github.com/dh1tw/remoteRotator/rotator"
 	"github.com/dh1tw/remoteRotator/rotator/proxy"
+	"github.com/dh1tw/remoteRotator/rotator/sb_proxy"
+	"github.com/micro/go-micro/broker"
+	"github.com/micro/go-micro/client"
+	"github.com/micro/go-micro/registry"
+	"github.com/micro/go-micro/transport"
+	natsBroker "github.com/micro/go-plugins/broker/nats"
+	natsReg "github.com/micro/go-plugins/registry/nats"
+	natsTr "github.com/micro/go-plugins/transport/nats"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -26,19 +35,54 @@ func init() {
 	RootCmd.AddCommand(webServerCmd)
 	webServerCmd.Flags().StringP("host", "w", "127.0.0.1", "Host (use '0.0.0.0' to listen on all network adapters)")
 	webServerCmd.Flags().IntP("port", "k", 7000, "webserver http port")
+	webServerCmd.Flags().StringP("station", "X", "mystation", "Your station callsign")
+	webServerCmd.Flags().StringP("transport", "t", "nats", "shackbus transport protocol (nats/lan)")
+	webServerCmd.Flags().StringP("broker-url", "u", "localhost", "Broker URL")
+	webServerCmd.Flags().IntP("broker-port", "p", 4222, "Broker Port")
 }
 
 func webServer(cmd *cobra.Command, args []string) {
 
 	viper.BindPFlag("web.host", cmd.Flags().Lookup("host"))
 	viper.BindPFlag("web.port", cmd.Flags().Lookup("port"))
+	viper.BindPFlag("shackbus.station", cmd.Flags().Lookup("station"))
+	viper.BindPFlag("shackbus.transport", cmd.Flags().Lookup("transport"))
+	viper.BindPFlag("shackbus.broker-url", cmd.Flags().Lookup("broker-url"))
+	viper.BindPFlag("shackbus.broker-port", cmd.Flags().Lookup("broker-port"))
 
 	h, err := hub.NewHub()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	w := webserver{h}
+
+	var reg registry.Registry
+	var tr transport.Transport
+	var br broker.Broker
+	var cl client.Client
+
+	sbTransport := strings.ToLower(viper.GetString("shackbus.transport"))
+
+	if sbTransport == "nats" {
+		url := viper.GetString("shackbus.broker-url")
+		port := viper.GetInt("shackbus.broker-port")
+		addr := fmt.Sprintf("%s:%v", url, port)
+		reg = natsReg.NewRegistry(registry.Addrs(addr))
+		tr = natsTr.NewTransport(transport.Addrs(addr))
+		br = natsBroker.NewBroker(broker.Addrs(addr))
+		cl = client.NewClient(
+			client.Broker(br),
+			client.Transport(tr),
+			client.Registry(reg),
+		)
+
+		// connect to broker
+		if err := br.Init(); err != nil {
+			fmt.Println(err)
+		}
+	}
+
+	w := webserver{h, cl, strings.ToLower(viper.GetString("shackbus.station"))}
 
 	ticker := time.NewTicker(time.Second * 5)
 
@@ -62,7 +106,12 @@ func webServer(cmd *cobra.Command, args []string) {
 			fmt.Println("web server crashed")
 			return
 		case <-ticker.C:
-			go w.update()
+			switch sbTransport {
+			case "lan":
+				go w.update()
+			case "nats":
+				go w.updateMicro()
+			}
 		case s := <-bcast:
 			ev := hub.Event{
 				Name:   hub.UpdateHeading,
@@ -75,6 +124,8 @@ func webServer(cmd *cobra.Command, args []string) {
 
 type webserver struct {
 	*hub.Hub
+	cli     client.Client
+	station string
 }
 
 var bcast = make(chan rotator.Status, 10)
@@ -92,6 +143,50 @@ var ev = func(r rotator.Rotator, ev rotator.Event, value ...interface{}) {
 		}
 	default:
 		log.Printf("unknown event: %v with value(s): %v\n", ev, value)
+	}
+}
+
+func (w *webserver) updateMicro() {
+	services, err := w.cli.Options().Registry.ListServices()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	for _, service := range services {
+
+		if !strings.Contains(service.Name, w.station) {
+			continue
+		}
+
+		if !strings.Contains(service.Name, "shackbus.rotator.") {
+			continue
+		}
+
+		splitted := strings.Split(service.Name, ".")
+		rotatorName := splitted[len(splitted)-1]
+
+		if !w.HasRotator(rotatorName) {
+			doneCh := make(chan struct{})
+			done := sbProxy.DoneCh(doneCh)
+			cli := sbProxy.Client(w.cli)
+			eh := sbProxy.EventHandler(ev)
+			name := sbProxy.Name(rotatorName)
+			serviceName := sbProxy.ServiceName(service.Name)
+			r, err := sbProxy.New(done, cli, eh, name, serviceName)
+			if err != nil {
+				log.Println("unable to create shackbus proxy object:", err)
+				r = nil
+				continue
+			}
+			if err := w.AddRotator(r); err != nil {
+				log.Println(err)
+				continue
+			}
+			go func() {
+				<-doneCh
+				w.RemoveRotator(r)
+			}()
+		}
 	}
 }
 
