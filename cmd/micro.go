@@ -37,7 +37,7 @@ var natsServerCmd = &cobra.Command{
 func init() {
 	serverCmd.AddCommand(natsServerCmd)
 
-	natsServerCmd.Flags().StringP("portname", "P", "/dev/ttyACM0", "portname / path to the rotator (e.g. COM1)")
+	natsServerCmd.Flags().StringP("portname", "d", "/dev/ttyACM0", "portname / path to the rotator (e.g. COM1)")
 	natsServerCmd.Flags().IntP("baudrate", "b", 9600, "baudrate")
 	natsServerCmd.Flags().StringP("type", "t", "yaesu", "Rotator type (supported: yaesu, dummy")
 	natsServerCmd.Flags().StringP("name", "n", "myRotator", "Name tag for the rotator")
@@ -52,6 +52,8 @@ func init() {
 	natsServerCmd.Flags().StringP("station", "X", "mystation", "Your station callsign")
 	natsServerCmd.Flags().StringP("broker-url", "u", "localhost", "Broker URL")
 	natsServerCmd.Flags().IntP("broker-port", "p", 4222, "Broker Port")
+	natsServerCmd.Flags().StringP("password", "P", "", "NATS Password")
+	natsServerCmd.Flags().StringP("username", "U", "", "NATS Username")
 
 }
 
@@ -84,8 +86,10 @@ func natsServer(cmd *cobra.Command, args []string) {
 	viper.BindPFlag("rotator.elevation-min", cmd.Flags().Lookup("elevation-min"))
 	viper.BindPFlag("rotator.elevation-max", cmd.Flags().Lookup("elevation-max"))
 	viper.BindPFlag("shackbus.station", cmd.Flags().Lookup("station"))
-	viper.BindPFlag("shackbus.broker-url", cmd.Flags().Lookup("broker-url"))
-	viper.BindPFlag("shackbus.broker-port", cmd.Flags().Lookup("broker-port"))
+	viper.BindPFlag("nats.broker-url", cmd.Flags().Lookup("broker-url"))
+	viper.BindPFlag("nats.broker-port", cmd.Flags().Lookup("broker-port"))
+	viper.BindPFlag("nats.password", cmd.Flags().Lookup("password"))
+	viper.BindPFlag("nats.username", cmd.Flags().Lookup("username"))
 
 	if len(viper.GetString("rotator.name")) == 0 {
 		log.Println("rotator name must not be empty")
@@ -208,11 +212,19 @@ func natsServer(cmd *cobra.Command, args []string) {
 		viper.GetString("shackbus.station"),
 		viper.GetString("rotator.name"))
 
-	url := viper.GetString("shackbus.broker-url")
-	port := viper.GetInt("shackbus.broker-port")
-	addr := fmt.Sprintf("%s:%v", url, port)
+	username := viper.GetString("nats.username")
+	password := viper.GetString("nats.password")
+	credentials := ""
+	if len(username) > 0 && len(password) > 0 {
+		credentials = fmt.Sprintf("%s:%s@", username, password)
+	}
+	url := viper.GetString("nats.broker-url")
+	port := viper.GetInt("nats.broker-port")
+	addr := fmt.Sprintf("nats://%s%s:%v", credentials, url, port)
 
-	reg := natsReg.NewRegistry(registry.Addrs(addr))
+	regTimeout := registry.Timeout(time.Millisecond * 200)
+
+	reg := natsReg.NewRegistry(registry.Addrs(addr), regTimeout)
 	tr := natsTr.NewTransport(transport.Addrs(addr))
 	br := natsBroker.NewBroker(broker.Addrs(addr))
 
@@ -255,8 +267,10 @@ func natsServer(cmd *cobra.Command, args []string) {
 		}
 	}()
 
-	rs.Run()
-
+	if err := rs.Run(); err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
 }
 
 type rpcRotator struct {
