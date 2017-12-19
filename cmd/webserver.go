@@ -16,6 +16,8 @@ import (
 	"github.com/micro/go-micro/broker"
 	"github.com/micro/go-micro/client"
 	"github.com/micro/go-micro/registry"
+	"github.com/micro/go-micro/selector"
+	"github.com/micro/go-micro/selector/cache"
 	"github.com/micro/go-micro/transport"
 	natsBroker "github.com/micro/go-plugins/broker/nats"
 	natsReg "github.com/micro/go-plugins/registry/nats"
@@ -39,6 +41,8 @@ func init() {
 	webServerCmd.Flags().StringP("transport", "t", "nats", "shackbus transport protocol (nats/lan)")
 	webServerCmd.Flags().StringP("broker-url", "u", "localhost", "Broker URL")
 	webServerCmd.Flags().IntP("broker-port", "p", 4222, "Broker Port")
+	webServerCmd.Flags().StringP("password", "P", "", "NATS Password")
+	webServerCmd.Flags().StringP("username", "U", "", "NATS Username")
 }
 
 func webServer(cmd *cobra.Command, args []string) {
@@ -47,8 +51,10 @@ func webServer(cmd *cobra.Command, args []string) {
 	viper.BindPFlag("web.port", cmd.Flags().Lookup("port"))
 	viper.BindPFlag("shackbus.station", cmd.Flags().Lookup("station"))
 	viper.BindPFlag("shackbus.transport", cmd.Flags().Lookup("transport"))
-	viper.BindPFlag("shackbus.broker-url", cmd.Flags().Lookup("broker-url"))
-	viper.BindPFlag("shackbus.broker-port", cmd.Flags().Lookup("broker-port"))
+	viper.BindPFlag("nats.broker-url", cmd.Flags().Lookup("broker-url"))
+	viper.BindPFlag("nats.broker-port", cmd.Flags().Lookup("broker-port"))
+	viper.BindPFlag("nats.password", cmd.Flags().Lookup("password"))
+	viper.BindPFlag("nats.username", cmd.Flags().Lookup("username"))
 
 	h, err := hub.NewHub()
 	if err != nil {
@@ -64,25 +70,42 @@ func webServer(cmd *cobra.Command, args []string) {
 	sbTransport := strings.ToLower(viper.GetString("shackbus.transport"))
 
 	if sbTransport == "nats" {
-		url := viper.GetString("shackbus.broker-url")
-		port := viper.GetInt("shackbus.broker-port")
-		addr := fmt.Sprintf("%s:%v", url, port)
-		reg = natsReg.NewRegistry(registry.Addrs(addr))
+		url := viper.GetString("nats.broker-url")
+		port := viper.GetInt("nats.broker-port")
+		username := viper.GetString("nats.username")
+		password := viper.GetString("nats.password")
+		credentials := ""
+		if len(username) > 0 && len(password) > 0 {
+			credentials = fmt.Sprintf("%s:%s@", username, password)
+		}
+		addr := fmt.Sprintf("nats://%s%s:%v", credentials, url, port)
+
+		regTimeout := registry.Timeout(time.Second * 2)
+
+		reg = natsReg.NewRegistry(registry.Addrs(addr), regTimeout)
 		tr = natsTr.NewTransport(transport.Addrs(addr))
 		br = natsBroker.NewBroker(broker.Addrs(addr))
 		cl = client.NewClient(
 			client.Broker(br),
 			client.Transport(tr),
 			client.Registry(reg),
+			client.PoolSize(2),
+			client.Selector(cache.NewSelector(selector.Registry(reg))),
 		)
 
 		// connect to broker
 		if err := br.Init(); err != nil {
 			fmt.Println(err)
+			return
 		}
+
 	}
 
 	w := webserver{h, cl, strings.ToLower(viper.GetString("shackbus.station"))}
+
+	if sbTransport == "nats" {
+		go w.updateMicro()
+	}
 
 	ticker := time.NewTicker(time.Second * 5)
 
@@ -109,8 +132,8 @@ func webServer(cmd *cobra.Command, args []string) {
 			switch sbTransport {
 			case "lan":
 				go w.update()
-			case "nats":
-				go w.updateMicro()
+				// case "nats":
+				// 	go w.updateMicro()
 			}
 		case s := <-bcast:
 			ev := hub.Event{
@@ -146,23 +169,80 @@ var ev = func(r rotator.Rotator, ev rotator.Event, value ...interface{}) {
 	}
 }
 
+// func (w *webserver) updateMicro() {
+// 	services, err := w.cli.Options().Registry.ListServices()
+// 	if err != nil {
+// 		log.Println(err)
+// 		os.Exit(1)
+// 		return
+// 	}
+// 	for _, service := range services {
+
+// 		if !strings.Contains(service.Name, w.station) {
+// 			continue
+// 		}
+
+// 		if !strings.Contains(service.Name, "shackbus.rotator.") {
+// 			continue
+// 		}
+
+// 		splitted := strings.Split(service.Name, ".")
+// 		rotatorName := splitted[len(splitted)-1]
+
+// 		if !w.HasRotator(rotatorName) {
+// 			doneCh := make(chan struct{})
+// 			done := sbProxy.DoneCh(doneCh)
+// 			cli := sbProxy.Client(w.cli)
+// 			eh := sbProxy.EventHandler(ev)
+// 			name := sbProxy.Name(rotatorName)
+// 			serviceName := sbProxy.ServiceName(service.Name)
+// 			r, err := sbProxy.New(done, cli, eh, name, serviceName)
+// 			if err != nil {
+// 				log.Println("unable to create shackbus proxy object:", err)
+// 				r = nil
+// 				continue
+// 			}
+// 			if err := w.AddRotator(r); err != nil {
+// 				log.Println(err)
+// 				continue
+// 			}
+// 			go func() {
+// 				<-doneCh
+// 				w.RemoveRotator(r)
+// 			}()
+// 		}
+// 	}
+// }
+
 func (w *webserver) updateMicro() {
-	services, err := w.cli.Options().Registry.ListServices()
+	watcher, err := w.cli.Options().Registry.Watch()
 	if err != nil {
 		log.Println(err)
+		os.Exit(1)
 		return
 	}
-	for _, service := range services {
 
-		if !strings.Contains(service.Name, w.station) {
+	for {
+		res, err := watcher.Next()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
 			continue
 		}
 
-		if !strings.Contains(service.Name, "shackbus.rotator.") {
+		if res.Action != "create" {
 			continue
 		}
 
-		splitted := strings.Split(service.Name, ".")
+		if !strings.Contains(res.Service.Name, w.station) {
+			continue
+		}
+
+		if !strings.Contains(res.Service.Name, "shackbus.rotator.") {
+			continue
+		}
+
+		splitted := strings.Split(res.Service.Name, ".")
 		rotatorName := splitted[len(splitted)-1]
 
 		if !w.HasRotator(rotatorName) {
@@ -171,7 +251,7 @@ func (w *webserver) updateMicro() {
 			cli := sbProxy.Client(w.cli)
 			eh := sbProxy.EventHandler(ev)
 			name := sbProxy.Name(rotatorName)
-			serviceName := sbProxy.ServiceName(service.Name)
+			serviceName := sbProxy.ServiceName(res.Service.Name)
 			r, err := sbProxy.New(done, cli, eh, name, serviceName)
 			if err != nil {
 				log.Println("unable to create shackbus proxy object:", err)
