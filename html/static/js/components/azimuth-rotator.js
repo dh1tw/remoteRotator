@@ -65,14 +65,12 @@ var AzimuthRotator = {
         this.drawRotator(this.heading, this.internalPreset, true);
         this.canvas.addEventListener("mouseup", this.mouseUpHandler);
         this.canvas.addEventListener("mousedown", this.mouseDownHandler);
-        this.canvas.addEventListener("click", this.mouseClickHandler);
         this.canvas.addEventListener("mousemove", this.mouseMoveHandler);
         this.canvas.addEventListener("mouseout", this.mouseOutHandler);
     },
     beforeDestroy: function () {
         this.canvas.removeEventListener("mousemove", this.mouseClickHandler);
         this.canvas.removeEventListener("mouseup", this.mouseUpHandler);
-        this.canvas.removeEventListener("click", this.mouseClickHandler);
         this.canvas.removeEventListener("mousedown", this.mouseDownHandler);
         this.canvas.removeEventListener("mouseout", this.mouseOutHandler);
     },
@@ -172,10 +170,6 @@ var AzimuthRotator = {
         
         mouseUpHandler: function (evt) {
             this.mouseDown = false;
-            this.$emit('set-azimuth', this.name, Math.round(this.internalPreset, 0));
-        },
-        
-        mouseClickHandler: function (evt) {
             var angle = this.getMousePosAngle(this.canvas, evt);
             this.$emit('set-azimuth', this.name, Math.round(angle, 0));
         },
