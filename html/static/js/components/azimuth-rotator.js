@@ -210,7 +210,6 @@ var AzimuthRotator = {
             this.drawHeadingNeedle(heading);
 
             if (this.isTurning || this.mouseDown) {
-                // console.log("drawing preset: ", preset)
                 this.drawPreset(preset, this.internalPresetOptions);
             }
         },
