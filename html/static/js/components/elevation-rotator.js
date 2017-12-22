@@ -23,7 +23,7 @@ var ElevationRotator = {
         return {
             canvas: null,
             ctx: null,
-            intPreset: 0, // internal Preset
+            internalPreset: 0, // internal Preset
             mouseDown: false,
             canvasOptions: {
                 scale: this.canvasSize / 100,
@@ -51,6 +51,7 @@ var ElevationRotator = {
     mounted: function () {
         this.canvas = this.$refs.elevationRotator;
         this.ctx = this.canvas.getContext("2d");
+        this.internalPreset = this.preset;
         this.drawRotator(this.heading, this.internalPreset, true);
         this.canvas.addEventListener("mouseup", this.mouseUpHandler);
         this.canvas.addEventListener("mousedown", this.mouseDownHandler);

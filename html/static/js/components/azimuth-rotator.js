@@ -21,10 +21,6 @@ var AzimuthRotator = {
             default: 360,
             type: Number,
         },
-        showHeading: {
-            default: true,
-            type: Boolean,
-        },
         showLegend: {
             default: true,
             type: Boolean,
@@ -34,7 +30,7 @@ var AzimuthRotator = {
         return {
             canvas: null,
             ctx: null,
-            intPreset: 0, // internal Preset
+            internalPreset: 0, // internal Preset
             mouseDown: false,
             canvasOptions: {
                 scale: this.canvasSize / 100,
@@ -62,6 +58,7 @@ var AzimuthRotator = {
     mounted: function () {
         this.canvas = this.$refs.azimuthRotator;
         this.ctx = this.canvas.getContext("2d");
+        this.internalPreset = this.preset;
         this.drawRotator(this.heading, this.internalPreset, true);
         this.canvas.addEventListener("mouseup", this.mouseUpHandler);
         this.canvas.addEventListener("mousedown", this.mouseDownHandler);
@@ -213,6 +210,7 @@ var AzimuthRotator = {
             this.drawHeadingNeedle(heading);
 
             if (this.isTurning || this.mouseDown) {
+                // console.log("drawing preset: ", preset)
                 this.drawPreset(preset, this.internalPresetOptions);
             }
         },
@@ -485,7 +483,7 @@ var AzimuthRotator = {
             if (!this.mouseDown) {
                 this.internalPreset = this.preset;
                 this.drawRotator(this.heading, this.internalPreset);
-            }
+            } 
         },
         min: function () {
             this.drawRotator(this.heading, this.internalPreset);
