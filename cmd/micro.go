@@ -54,7 +54,6 @@ func init() {
 	natsServerCmd.Flags().IntP("broker-port", "p", 4222, "Broker Port")
 	natsServerCmd.Flags().StringP("password", "P", "", "NATS Password")
 	natsServerCmd.Flags().StringP("username", "U", "", "NATS Username")
-
 }
 
 func natsServer(cmd *cobra.Command, args []string) {
@@ -228,12 +227,17 @@ func natsServer(cmd *cobra.Command, args []string) {
 	tr := natsTr.NewTransport(transport.Addrs(addr))
 	br := natsBroker.NewBroker(broker.Addrs(addr))
 
+	if version == "" {
+		version = "dev"
+	}
+
 	rs := micro.NewService(
 		micro.Name(serviceName),
 		micro.RegisterInterval(time.Second*10),
 		micro.Broker(br),
 		micro.Transport(tr),
 		micro.Registry(reg),
+		micro.Version(version),
 	)
 
 	rs.Init()
@@ -249,6 +253,7 @@ func natsServer(cmd *cobra.Command, args []string) {
 
 	rpcr := rpcRotator{
 		rotator:     r,
+		service:     rs,
 		broker:      br,
 		pubSubTopic: fmt.Sprintf("%s.state", serviceName),
 	}
@@ -274,6 +279,7 @@ func natsServer(cmd *cobra.Command, args []string) {
 }
 
 type rpcRotator struct {
+	service     micro.Service
 	rotator     rotator.Rotator
 	broker      broker.Broker
 	pubSubTopic string
@@ -297,7 +303,13 @@ func (r *rpcRotator) PublishState(status rotator.Status) {
 
 	if err := r.broker.Publish(r.pubSubTopic, &msg); err != nil {
 		log.Println(err)
+		r.shutdown()
 	}
+}
+
+func (r *rpcRotator) shutdown() {
+	r.service.Server().Stop()
+	os.Exit(1)
 }
 
 func (r *rpcRotator) SetAzimuth(ctx context.Context, req *sbRotator.HeadingReq, resp *sbRotator.None) error {

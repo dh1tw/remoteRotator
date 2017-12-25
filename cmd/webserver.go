@@ -45,6 +45,10 @@ func init() {
 	webServerCmd.Flags().StringP("username", "U", "", "NATS Username")
 }
 
+// func neverRetry(ctx context.Context, req client.Request, retryCount int, err error) (bool, error) {
+// 	return false, nil
+// }
+
 func webServer(cmd *cobra.Command, args []string) {
 
 	viper.BindPFlag("web.host", cmd.Flags().Lookup("host"))
@@ -81,15 +85,17 @@ func webServer(cmd *cobra.Command, args []string) {
 		addr := fmt.Sprintf("nats://%s%s:%v", credentials, url, port)
 
 		regTimeout := registry.Timeout(time.Second * 2)
+		trTimeout := transport.Timeout(time.Second * 2)
 
 		reg = natsReg.NewRegistry(registry.Addrs(addr), regTimeout)
-		tr = natsTr.NewTransport(transport.Addrs(addr))
+		tr = natsTr.NewTransport(transport.Addrs(addr), trTimeout)
 		br = natsBroker.NewBroker(broker.Addrs(addr))
 		cl = client.NewClient(
 			client.Broker(br),
 			client.Transport(tr),
 			client.Registry(reg),
 			client.PoolSize(2),
+			// client.Retry(neverRetry),
 			client.Selector(cache.NewSelector(selector.Registry(reg))),
 		)
 
@@ -103,8 +109,19 @@ func webServer(cmd *cobra.Command, args []string) {
 
 	w := webserver{h, cl, strings.ToLower(viper.GetString("shackbus.station"))}
 
+	// will be closed when an error occures in the webserver goroutine
+	webserverErrorCh := make(chan struct{})
+
+	go w.ListenHTTP(viper.GetString("web.host"), viper.GetInt("web.port"), webserverErrorCh)
+
+	// at startup query the registry and add all existing rotators
+	if err := w.listAndAddRotators(); err != nil {
+		log.Println(err)
+	}
+
+	// watch the registry in a seperate thread for changes
 	if sbTransport == "nats" {
-		go w.updateMicro()
+		go w.watchRegistry()
 	}
 
 	ticker := time.NewTicker(time.Second * 5)
@@ -115,25 +132,19 @@ func webServer(cmd *cobra.Command, args []string) {
 	//subscribe to os.Interrupt (CTRL-C signal)
 	signal.Notify(osSignals, os.Interrupt)
 
-	done := make(chan bool)
-
-	go w.ListenHTTP(viper.GetString("web.host"), viper.GetInt("web.port"), done)
-
 	for {
 		select {
 		case sig := <-osSignals:
 			if sig == os.Interrupt {
 				return
 			}
-		case <-done:
+		case <-webserverErrorCh:
 			fmt.Println("web server crashed")
 			return
 		case <-ticker.C:
 			switch sbTransport {
 			case "lan":
 				go w.update()
-				// case "nats":
-				// 	go w.updateMicro()
 			}
 		case s := <-bcast:
 			ev := hub.Event{
@@ -169,52 +180,88 @@ var ev = func(r rotator.Rotator, ev rotator.Event, value ...interface{}) {
 	}
 }
 
-// func (w *webserver) updateMicro() {
-// 	services, err := w.cli.Options().Registry.ListServices()
-// 	if err != nil {
-// 		log.Println(err)
-// 		os.Exit(1)
-// 		return
-// 	}
-// 	for _, service := range services {
+//extract the service's name from its fully qualified service name (FQSN)
+func nameFromFQSN(serviceName string) string {
+	splitted := strings.Split(serviceName, ".")
+	return splitted[len(splitted)-1]
+}
 
-// 		if !strings.Contains(service.Name, w.station) {
-// 			continue
-// 		}
+func (w *webserver) addRotator(rotatorServiceName string) error {
 
-// 		if !strings.Contains(service.Name, "shackbus.rotator.") {
-// 			continue
-// 		}
+	rotatorName := nameFromFQSN(rotatorServiceName)
 
-// 		splitted := strings.Split(service.Name, ".")
-// 		rotatorName := splitted[len(splitted)-1]
+	// only continue if this rotator(name) does not exist yet
+	_, exists := w.Rotator(rotatorName)
+	if exists {
+		return nil
+	}
 
-// 		if !w.HasRotator(rotatorName) {
-// 			doneCh := make(chan struct{})
-// 			done := sbProxy.DoneCh(doneCh)
-// 			cli := sbProxy.Client(w.cli)
-// 			eh := sbProxy.EventHandler(ev)
-// 			name := sbProxy.Name(rotatorName)
-// 			serviceName := sbProxy.ServiceName(service.Name)
-// 			r, err := sbProxy.New(done, cli, eh, name, serviceName)
-// 			if err != nil {
-// 				log.Println("unable to create shackbus proxy object:", err)
-// 				r = nil
-// 				continue
-// 			}
-// 			if err := w.AddRotator(r); err != nil {
-// 				log.Println(err)
-// 				continue
-// 			}
-// 			go func() {
-// 				<-doneCh
-// 				w.RemoveRotator(r)
-// 			}()
-// 		}
-// 	}
-// }
+	doneCh := make(chan struct{})
 
-func (w *webserver) updateMicro() {
+	done := sbProxy.DoneCh(doneCh)
+	cli := sbProxy.Client(w.cli)
+	eh := sbProxy.EventHandler(ev)
+	name := sbProxy.Name(rotatorName)
+	serviceName := sbProxy.ServiceName(rotatorServiceName)
+
+	// create new rotator proxy object
+	r, err := sbProxy.New(done, cli, eh, name, serviceName)
+	if err != nil {
+		return fmt.Errorf("unable to create proxy object: %v", err)
+	}
+
+	if err := w.AddRotator(r); err != nil {
+		return fmt.Errorf("unable to add proxy objects: %v", err)
+	}
+
+	go func() {
+		<-doneCh
+		w.RemoveRotator(r)
+	}()
+
+	return nil
+}
+
+// listAndAddRotators is a convenience function which queries the
+// registry for all rotator services and then add proxy objects for
+// each of them.
+func (w *webserver) listAndAddRotators() error {
+
+	services, err := w.cli.Options().Registry.ListServices()
+	if err != nil {
+		return err
+	}
+
+	for _, service := range services {
+		fmt.Println("found:", service.Name)
+		if !isRotator(service.Name, w.station) {
+			continue
+		}
+		if err := w.addRotator(service.Name); err != nil {
+			log.Println(err)
+		}
+	}
+
+	return nil
+}
+
+// isRotator checks a serviceName string if it is a shackbus
+// rotator for the selected station
+func isRotator(serviceName, station string) bool {
+
+	if !strings.Contains(serviceName, station) {
+		return false
+	}
+
+	if !strings.Contains(serviceName, "shackbus.rotator.") {
+		return false
+	}
+	return true
+}
+
+// watchRegistry is a blocking function which continously
+// checks the registry for changes (new rotators being added/updated/removed).
+func (w *webserver) watchRegistry() {
 	watcher, err := w.cli.Options().Registry.Watch()
 	if err != nil {
 		log.Println(err)
@@ -225,47 +272,29 @@ func (w *webserver) updateMicro() {
 	for {
 		res, err := watcher.Next()
 		if err != nil {
+			// in case of a timeout (which most likely is a disconnect)
+			// close the application
 			fmt.Println(err)
 			os.Exit(1)
+		}
+
+		if !isRotator(res.Service.Name, w.station) {
 			continue
 		}
 
-		if res.Action != "create" {
-			continue
-		}
-
-		if !strings.Contains(res.Service.Name, w.station) {
-			continue
-		}
-
-		if !strings.Contains(res.Service.Name, "shackbus.rotator.") {
-			continue
-		}
-
-		splitted := strings.Split(res.Service.Name, ".")
-		rotatorName := splitted[len(splitted)-1]
-
-		if !w.HasRotator(rotatorName) {
-			doneCh := make(chan struct{})
-			done := sbProxy.DoneCh(doneCh)
-			cli := sbProxy.Client(w.cli)
-			eh := sbProxy.EventHandler(ev)
-			name := sbProxy.Name(rotatorName)
-			serviceName := sbProxy.ServiceName(res.Service.Name)
-			r, err := sbProxy.New(done, cli, eh, name, serviceName)
-			if err != nil {
-				log.Println("unable to create shackbus proxy object:", err)
-				r = nil
-				continue
-			}
-			if err := w.AddRotator(r); err != nil {
+		if res.Action == "create" {
+			if err := w.addRotator(res.Service.Name); err != nil {
 				log.Println(err)
+			}
+		}
+
+		if res.Action == "delete" {
+			rotatorName := nameFromFQSN(res.Service.Name)
+			r, exists := w.Rotator(rotatorName)
+			if !exists {
 				continue
 			}
-			go func() {
-				<-doneCh
-				w.RemoveRotator(r)
-			}()
+			r.Close()
 		}
 	}
 }
@@ -281,28 +310,32 @@ func (w *webserver) update() {
 	// check if rotator(s) are not registered yet
 	for _, dr := range dsvrdRotators {
 
-		// if the rotator is new, then add it
-		if !w.HasRotator(dr.Name) {
-
-			doneCh := make(chan struct{})
-			done := proxy.DoneCh(doneCh)
-			host := proxy.Host(dr.AddrV4.String())
-			port := proxy.Port(dr.Port)
-			eh := proxy.EventHandler(ev)
-			r, err := proxy.New(done, host, port, eh)
-			if err != nil {
-				log.Println("unable to create proxy object:", err)
-				r = nil
-				continue
-			}
-			if err := w.AddRotator(r); err != nil {
-				log.Println(err)
-				continue
-			}
-			go func() {
-				<-doneCh
-				w.RemoveRotator(r)
-			}()
+		// only add when the rotator is not registed yet
+		_, exists := w.Rotator(dr.Name)
+		if exists {
+			continue
 		}
+
+		doneCh := make(chan struct{})
+		done := proxy.DoneCh(doneCh)
+		host := proxy.Host(dr.AddrV4.String())
+		port := proxy.Port(dr.Port)
+		eh := proxy.EventHandler(ev)
+		r, err := proxy.New(done, host, port, eh)
+		if err != nil {
+			log.Println("unable to create proxy object:", err)
+			r.Close()
+			r = nil
+			continue
+		}
+		if err := w.AddRotator(r); err != nil {
+			log.Println(err)
+			continue
+		}
+		go func() {
+			<-doneCh
+			w.RemoveRotator(r)
+		}()
 	}
+
 }

@@ -30,8 +30,8 @@ type SbProxy struct {
 	azPreset       int
 	elevation      int
 	elPreset       int
-	closeCh        chan struct{}
 	doneCh         chan struct{}
+	doneOnce       sync.Once
 	subscriber     broker.Subscriber
 	serviceName    string
 }
@@ -75,8 +75,7 @@ func New(opts ...func(*SbProxy)) (*SbProxy, error) {
 
 	r := &SbProxy{
 		name:        "rotatorProxy",
-		serviceName: "mystation.shackbus.rotator.rotatorProxy",
-		closeCh:     make(chan struct{}),
+		serviceName: "mystation.shackbus.rotator.myRotator",
 	}
 
 	for _, opt := range opts {
@@ -93,35 +92,20 @@ func New(opts ...func(*SbProxy)) (*SbProxy, error) {
 	if err := br.Connect(); err != nil {
 		return nil, err
 	}
+
 	sub, err := br.Subscribe(r.serviceName+".state", r.updateHandler)
 	if err != nil {
 		return nil, err
 	}
 	r.subscriber = sub
 
-	reg := r.cli.Options().Registry
-	watcher, err := reg.Watch()
-	if err != nil {
-		return nil, err
-	}
-
-	go func() {
-		for {
-			res, err := watcher.Next()
-			if err != nil {
-				log.Println("watcher", err)
-				close(r.doneCh)
-				return
-
-			}
-			if res.Action == "delete" && res.Service.Name == r.serviceName {
-				close(r.doneCh)
-				return
-			}
-		}
-	}()
-
 	return r, nil
+}
+
+// the doneCh must be closed through this function to avoid
+// multiple times closing this channel
+func (r *SbProxy) closeDone() {
+	r.doneOnce.Do(func() { close(r.doneCh) })
 }
 
 func (r *SbProxy) updateHandler(p broker.Publication) error {
@@ -225,26 +209,32 @@ func (r *SbProxy) ElPreset() int {
 }
 
 func (r *SbProxy) SetAzimuth(az int) error {
+	log.Println("setting azimuth")
+
 	_, err := r.rcli.SetAzimuth(context.Background(), &sbRotator.HeadingReq{Heading: int32(az)})
 	return err
 }
 
 func (r *SbProxy) SetElevation(el int) error {
+	log.Println("setting elevation")
 	_, err := r.rcli.SetElevation(context.Background(), &sbRotator.HeadingReq{Heading: int32(el)})
 	return err
 }
 
 func (r *SbProxy) StopAzimuth() error {
+	log.Println("stopping azimuth")
 	_, err := r.rcli.StopAzimuth(context.Background(), &sbRotator.None{})
 	return err
 }
 
 func (r *SbProxy) StopElevation() error {
+	log.Println("stopping elevation")
 	_, err := r.rcli.StopElevation(context.Background(), &sbRotator.None{})
 	return err
 }
 
 func (r *SbProxy) Stop() error {
+	log.Println("stopping all")
 	_, err := r.rcli.StopAzimuth(context.Background(), &sbRotator.None{})
 	_, err = r.rcli.StopElevation(context.Background(), &sbRotator.None{})
 	return err
@@ -264,26 +254,31 @@ func (r *SbProxy) Status() rotator.Status {
 }
 
 func (r *SbProxy) ExecuteRequest(req rotator.Request) error {
+
 	if req.HasAzimuth {
 		if err := r.SetAzimuth(req.Azimuth); err != nil {
 			return err
 		}
 	}
+
 	if req.HasElevation {
 		if err := r.SetElevation(req.Elevation); err != nil {
 			return err
 		}
 	}
+
 	if req.Stop {
 		if err := r.Stop(); err != nil {
 			return err
 		}
 	}
+
 	if req.StopAzimuth {
 		if err := r.StopAzimuth(); err != nil {
 			return err
 		}
 	}
+
 	if req.StopElevation {
 		if err := r.StopElevation(); err != nil {
 			return err
@@ -315,5 +310,11 @@ func (r *SbProxy) Info() rotator.Info {
 }
 
 func (r *SbProxy) Close() {
-
+	if r.subscriber != nil {
+		err := r.subscriber.Unsubscribe()
+		if err != nil {
+			log.Println("unsubscribe problem:", err)
+		}
+	}
+	r.closeDone()
 }

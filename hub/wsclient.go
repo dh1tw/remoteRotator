@@ -53,7 +53,7 @@ func (c *WsClient) listen(hub *Hub, closer chan<- *WsClient) {
 
 		if err := r.ExecuteRequest(req); err != nil {
 			log.Printf("websocket unable to execute request (%v): %v\n", c.RemoteAddr(), err)
-			return
+			r.Close()
 		}
 	}
 }

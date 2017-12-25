@@ -248,11 +248,11 @@ func lanServer(cmd *cobra.Command, args []string) {
 		go h.ListenTCP(viper.GetString("tcp.host"), viper.GetInt("tcp.port"), tcpError)
 	}
 
-	wsError := make(chan bool)
+	webServerError := make(chan struct{})
 
 	// start HTTP server
 	if viper.GetBool("http.enabled") {
-		go h.ListenHTTP(viper.GetString("http.host"), viper.GetInt("http.port"), wsError)
+		go h.ListenHTTP(viper.GetString("http.host"), viper.GetInt("http.port"), webServerError)
 	}
 
 	// start mDNS server
@@ -284,7 +284,7 @@ func lanServer(cmd *cobra.Command, args []string) {
 			return
 		case <-tcpError:
 			return
-		case <-wsError:
+		case <-webServerError:
 			return
 		}
 	}

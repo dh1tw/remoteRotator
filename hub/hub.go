@@ -97,18 +97,19 @@ func (hub *Hub) RemoveRotator(r rotator.Rotator) {
 		fmt.Println(err)
 	}
 
-	delete(hub.rotators, r.Name())
 	r.Close()
+	delete(hub.rotators, r.Name())
 	log.Printf("removed rotator (%s)\n", r.Name())
 }
 
-// HasRotator returns a bool if a given rotator is already registered.
-func (hub *Hub) HasRotator(name string) bool {
+// Rotator returns a particular rotator stored from the hub. If no
+// rotator exists with that name, (nil, false) will be returned.
+func (hub *Hub) Rotator(name string) (rotator.Rotator, bool) {
 	hub.RLock()
 	defer hub.RUnlock()
 
-	_, ok := hub.rotators[name]
-	return ok
+	rotator, ok := hub.rotators[name]
+	return rotator, ok
 }
 
 // Rotators returns a slice of all registered rotators.
@@ -272,10 +273,10 @@ func (hub *Hub) infoHandler(w http.ResponseWriter, r *http.Request) {
 // sets a HTTP and Websocket handler.
 // Since this function contains an endless loop, it should be executed
 // in a go routine. If the listener can not be initialized, it will
-// close the wsError channel.
-func (hub *Hub) ListenHTTP(host string, port int, wsError chan<- bool) {
+// close the errorCh channel.
+func (hub *Hub) ListenHTTP(host string, port int, errorCh chan<- struct{}) {
 
-	defer close(wsError)
+	defer close(errorCh)
 
 	box := rice.MustFindBox("../html")
 	fileServer := http.FileServer(box.HTTPBox())
