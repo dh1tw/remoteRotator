@@ -34,7 +34,7 @@ type Yaesu struct {
 	elInitialized   bool
 	pollingInterval time.Duration
 	pollingTicker   *time.Ticker
-	eventHandler    func(rotator.Rotator, rotator.Event, ...interface{})
+	eventHandler    func(rotator.Rotator, rotator.Status)
 	sp              io.ReadWriteCloser
 	spPortName      string
 	spBaudrate      int
@@ -77,7 +77,7 @@ func UpdateInterval(d time.Duration) func(*Yaesu) {
 
 // EventHandler sets a callback function through which the rotator
 // will report Event
-func EventHandler(h func(rotator.Rotator, rotator.Event, ...interface{})) func(*Yaesu) {
+func EventHandler(h func(rotator.Rotator, rotator.Status)) func(*Yaesu) {
 	return func(r *Yaesu) {
 		r.eventHandler = h
 	}
@@ -303,54 +303,47 @@ func (r *Yaesu) write(data []byte) (int, error) {
 func (r *Yaesu) parseMsg(msg string) {
 
 	headings := []string{}
+	gotNewValue := false
 
 	if r.headingPattern != nil {
 		headings = r.headingPattern.FindAllString(msg, -1)
 	}
 
+	r.Lock()
+	defer r.Unlock()
+
 	if len(headings) > 0 {
 		//contains always 4 digits
 		az, _ := strconv.Atoi(headings[0][1:]) //discard the first digit, since it's always 0
-		r.setValueAndCallEvent(rotator.Azimuth, az)
+
+		if !r.azInitialized {
+			r.azPreset = az
+			r.azInitialized = true
+			gotNewValue = true
+		}
+
+		if r.azimuth != az {
+			r.azimuth = az
+			gotNewValue = true
+		}
 	}
 
 	if len(headings) == 2 {
 		// contains always 4 digits
 		el, _ := strconv.Atoi(headings[1][1:])
-		r.setValueAndCallEvent(rotator.Elevation, el)
-	}
-}
 
-// verify if the data has changed. If so, notify the application through
-// the callback
-func (r *Yaesu) setValueAndCallEvent(ev rotator.Event, value int) {
-	r.Lock()
-	defer r.Unlock()
-
-	switch ev {
-	case rotator.Azimuth:
-		if !r.azInitialized {
-			r.azPreset = value
-			r.azInitialized = true
-		}
-		if r.azimuth != value {
-			r.azimuth = value
-			if r.eventHandler != nil {
-				// cb launched async to avoid deadlock on yaesu.*()
-				go r.eventHandler(r, rotator.Azimuth, r.serialize())
-			}
-		}
-	case rotator.Elevation:
 		if !r.elInitialized {
-			r.elPreset = value
+			r.elPreset = el
 			r.elInitialized = true
 		}
-		if r.elevation != value {
-			r.elevation = value
-			if r.eventHandler != nil {
-				// cb launched async to avoid deadlock on yaesu.*()
-				go r.eventHandler(r, rotator.Elevation, r.serialize())
-			}
+
+		if r.elevation != el {
+			r.elevation = el
+		}
+
+		if r.eventHandler != nil && gotNewValue {
+			// cb launched async to avoid deadlock on yaesu.*()
+			go r.eventHandler(r, r.serialize())
 		}
 	}
 }

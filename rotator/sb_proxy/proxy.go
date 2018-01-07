@@ -2,12 +2,11 @@ package sbProxy
 
 import (
 	"context"
-	"encoding/json"
-	"log"
 	"sync"
 
 	"github.com/dh1tw/remoteRotator/rotator"
 	sbRotator "github.com/dh1tw/remoteRotator/sb_rotator"
+	"github.com/gogo/protobuf/proto"
 	"github.com/micro/go-micro/broker"
 	"github.com/micro/go-micro/client"
 )
@@ -16,7 +15,7 @@ type SbProxy struct {
 	sync.RWMutex
 	cli            client.Client
 	rcli           sbRotator.RotatorClient
-	eventHandler   func(rotator.Rotator, rotator.Event, ...interface{})
+	eventHandler   func(rotator.Rotator, rotator.Status)
 	name           string
 	azimuthMin     int
 	azimuthMax     int
@@ -43,7 +42,8 @@ func Client(cli client.Client) func(*SbProxy) {
 }
 
 // DoneCh is a functional option allows you to pass a channel to the proxy object.
-// The channel will be closed and thus notifies you when the object has been deleted.
+// This channel will be closed by this object. It serves as a notification that
+// the object can be deleted.
 func DoneCh(ch chan struct{}) func(*SbProxy) {
 	return func(r *SbProxy) {
 		r.doneCh = ch
@@ -64,7 +64,7 @@ func ServiceName(name string) func(*SbProxy) {
 
 // EventHandler sets a callback function through which the proxy rotator
 // will report Events
-func EventHandler(h func(rotator.Rotator, rotator.Event, ...interface{})) func(*SbProxy) {
+func EventHandler(h func(rotator.Rotator, rotator.Status)) func(*SbProxy) {
 	return func(r *SbProxy) {
 		r.eventHandler = h
 	}
@@ -75,7 +75,7 @@ func New(opts ...func(*SbProxy)) (*SbProxy, error) {
 
 	r := &SbProxy{
 		name:        "rotatorProxy",
-		serviceName: "mystation.shackbus.rotator.myRotator",
+		serviceName: "shackbus.rotator.myRotator",
 	}
 
 	for _, opt := range opts {
@@ -103,7 +103,8 @@ func New(opts ...func(*SbProxy)) (*SbProxy, error) {
 }
 
 // the doneCh must be closed through this function to avoid
-// multiple times closing this channel
+// multiple times closing this channel. Closing the doneCh signals the
+// application that this object can be disposed
 func (r *SbProxy) closeDone() {
 	r.doneOnce.Do(func() { close(r.doneCh) })
 }
@@ -111,7 +112,7 @@ func (r *SbProxy) closeDone() {
 func (r *SbProxy) updateHandler(p broker.Publication) error {
 
 	state := sbRotator.State{}
-	err := json.Unmarshal(p.Message().Body, &state)
+	err := proto.Unmarshal(p.Message().Body, &state)
 	if err != nil {
 		return err
 	}
@@ -134,7 +135,7 @@ func (r *SbProxy) updateHandler(p broker.Publication) error {
 	}
 
 	if r.eventHandler != nil {
-		go r.eventHandler(r, rotator.Azimuth, status)
+		go r.eventHandler(r, status)
 	}
 
 	return nil
@@ -209,32 +210,26 @@ func (r *SbProxy) ElPreset() int {
 }
 
 func (r *SbProxy) SetAzimuth(az int) error {
-	log.Println("setting azimuth")
-
 	_, err := r.rcli.SetAzimuth(context.Background(), &sbRotator.HeadingReq{Heading: int32(az)})
 	return err
 }
 
 func (r *SbProxy) SetElevation(el int) error {
-	log.Println("setting elevation")
 	_, err := r.rcli.SetElevation(context.Background(), &sbRotator.HeadingReq{Heading: int32(el)})
 	return err
 }
 
 func (r *SbProxy) StopAzimuth() error {
-	log.Println("stopping azimuth")
 	_, err := r.rcli.StopAzimuth(context.Background(), &sbRotator.None{})
 	return err
 }
 
 func (r *SbProxy) StopElevation() error {
-	log.Println("stopping elevation")
 	_, err := r.rcli.StopElevation(context.Background(), &sbRotator.None{})
 	return err
 }
 
 func (r *SbProxy) Stop() error {
-	log.Println("stopping all")
 	_, err := r.rcli.StopAzimuth(context.Background(), &sbRotator.None{})
 	_, err = r.rcli.StopElevation(context.Background(), &sbRotator.None{})
 	return err
@@ -311,10 +306,7 @@ func (r *SbProxy) Info() rotator.Info {
 
 func (r *SbProxy) Close() {
 	if r.subscriber != nil {
-		err := r.subscriber.Unsubscribe()
-		if err != nil {
-			log.Println("unsubscribe problem:", err)
-		}
+		r.subscriber.Unsubscribe()
 	}
 	r.closeDone()
 }

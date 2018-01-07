@@ -8,22 +8,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/micro/go-micro/broker"
+	"github.com/micro/go-micro/client"
+	"github.com/micro/go-micro/registry"
+	"github.com/micro/go-micro/transport"
+	natsBroker "github.com/micro/go-plugins/broker/nats"
+	natsReg "github.com/micro/go-plugins/registry/nats"
+	"github.com/micro/go-plugins/selector/named"
+	natsTr "github.com/micro/go-plugins/transport/nats"
+	"github.com/nats-io/nats"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
 	"github.com/dh1tw/remoteRotator/discovery"
 	"github.com/dh1tw/remoteRotator/hub"
 	"github.com/dh1tw/remoteRotator/rotator"
 	"github.com/dh1tw/remoteRotator/rotator/proxy"
 	"github.com/dh1tw/remoteRotator/rotator/sb_proxy"
-	"github.com/micro/go-micro/broker"
-	"github.com/micro/go-micro/client"
-	"github.com/micro/go-micro/registry"
-	"github.com/micro/go-micro/selector"
-	"github.com/micro/go-micro/selector/cache"
-	"github.com/micro/go-micro/transport"
-	natsBroker "github.com/micro/go-plugins/broker/nats"
-	natsReg "github.com/micro/go-plugins/registry/nats"
-	natsTr "github.com/micro/go-plugins/transport/nats"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var webServerCmd = &cobra.Command{
@@ -71,6 +72,8 @@ func webServer(cmd *cobra.Command, args []string) {
 	var br broker.Broker
 	var cl client.Client
 
+	connClosed := make(chan struct{})
+
 	sbTransport := strings.ToLower(viper.GetString("shackbus.transport"))
 
 	if sbTransport == "nats" {
@@ -78,43 +81,62 @@ func webServer(cmd *cobra.Command, args []string) {
 		port := viper.GetInt("nats.broker-port")
 		username := viper.GetString("nats.username")
 		password := viper.GetString("nats.password")
-		credentials := ""
-		if len(username) > 0 && len(password) > 0 {
-			credentials = fmt.Sprintf("%s:%s@", username, password)
+
+		nopts := nats.GetDefaultOptions()
+		nopts.Servers = []string{fmt.Sprintf("%s:%d", url, port)}
+		nopts.User = username
+		nopts.Password = password
+
+		disconnectedHdlr := func(conn *nats.Conn) {
+			log.Println("connection to nats broker closed")
+			connClosed <- struct{}{}
 		}
-		addr := fmt.Sprintf("nats://%s%s:%v", credentials, url, port)
+		// nopts.DisconnectedCB = disconnectHdlr
+
+		errorHdlr := func(conn *nats.Conn, sub *nats.Subscription, err error) {
+			log.Printf("Error Handler called (%s): %s", sub.Subject, err)
+		}
+		nopts.AsyncErrorCB = errorHdlr
+
+		regNatsOpts := nopts
+		brNatsOpts := nopts
+		trNatsOpts := nopts
+		regNatsOpts.DisconnectedCB = disconnectedHdlr
+		regNatsOpts.Name = "remoteRotator.client:registry"
+		brNatsOpts.Name = "remoteRotator.client:broker"
+		trNatsOpts.Name = "remoteRotator.client:transport"
 
 		regTimeout := registry.Timeout(time.Second * 2)
 		trTimeout := transport.Timeout(time.Second * 2)
 
-		reg = natsReg.NewRegistry(registry.Addrs(addr), regTimeout)
-		tr = natsTr.NewTransport(transport.Addrs(addr), trTimeout)
-		br = natsBroker.NewBroker(broker.Addrs(addr))
+		reg = natsReg.NewRegistry(natsReg.Options(regNatsOpts), regTimeout)
+		tr = natsTr.NewTransport(natsTr.Options(trNatsOpts), trTimeout)
+		br = natsBroker.NewBroker(natsBroker.Options(brNatsOpts))
 		cl = client.NewClient(
 			client.Broker(br),
 			client.Transport(tr),
 			client.Registry(reg),
-			client.PoolSize(2),
-			// client.Retry(neverRetry),
-			client.Selector(cache.NewSelector(selector.Registry(reg))),
+			client.PoolSize(1),
+			client.PoolTTL(time.Hour*8760), // one year - don't TTL our connection
+			client.Selector(named.NewSelector()),
+			// client.Selector(cache.NewSelector(selector.Registry(reg))),
 		)
 
-		// connect to broker
-		if err := br.Init(); err != nil {
-			fmt.Println(err)
+		if err := cl.Init(); err != nil {
+			log.Println(err)
 			return
 		}
-
 	}
 
-	w := webserver{h, cl, strings.ToLower(viper.GetString("shackbus.station"))}
+	w := webserver{h, cl}
 
 	// will be closed when an error occures in the webserver goroutine
 	webserverErrorCh := make(chan struct{})
 
+	// launch webserver
 	go w.ListenHTTP(viper.GetString("web.host"), viper.GetInt("web.port"), webserverErrorCh)
 
-	// at startup query the registry and add all existing rotators
+	// at startup query the registry and add all found rotators
 	if err := w.listAndAddRotators(); err != nil {
 		log.Println(err)
 	}
@@ -124,6 +146,7 @@ func webServer(cmd *cobra.Command, args []string) {
 		go w.watchRegistry()
 	}
 
+	// ticker for check lan registry
 	ticker := time.NewTicker(time.Second * 5)
 
 	// Channel to handle OS signals
@@ -137,6 +160,11 @@ func webServer(cmd *cobra.Command, args []string) {
 		case sig := <-osSignals:
 			if sig == os.Interrupt {
 				return
+			}
+		case <-connClosed:
+			rotators := w.Rotators()
+			for _, r := range rotators {
+				r.Close()
 			}
 		case <-webserverErrorCh:
 			fmt.Println("web server crashed")
@@ -158,32 +186,20 @@ func webServer(cmd *cobra.Command, args []string) {
 
 type webserver struct {
 	*hub.Hub
-	cli     client.Client
-	station string
+	cli client.Client
 }
 
 var bcast = make(chan rotator.Status, 10)
 
-var ev = func(r rotator.Rotator, ev rotator.Event, value ...interface{}) {
-	// fmt.Println(ev, value)
-	switch ev {
-	case rotator.Azimuth, rotator.Elevation:
-		if len(value) == 0 {
-			return
-		}
-		switch value[0].(type) {
-		case rotator.Status:
-			bcast <- value[0].(rotator.Status)
-		}
-	default:
-		log.Printf("unknown event: %v with value(s): %v\n", ev, value)
-	}
+var ev = func(r rotator.Rotator, status rotator.Status) {
+	bcast <- status
 }
 
 //extract the service's name from its fully qualified service name (FQSN)
 func nameFromFQSN(serviceName string) string {
 	splitted := strings.Split(serviceName, ".")
-	return splitted[len(splitted)-1]
+	name := splitted[len(splitted)-1]
+	return strings.Replace(name, "_", " ", -1)
 }
 
 func (w *webserver) addRotator(rotatorServiceName string) error {
@@ -207,15 +223,18 @@ func (w *webserver) addRotator(rotatorServiceName string) error {
 	// create new rotator proxy object
 	r, err := sbProxy.New(done, cli, eh, name, serviceName)
 	if err != nil {
+		close(doneCh)
 		return fmt.Errorf("unable to create proxy object: %v", err)
 	}
 
 	if err := w.AddRotator(r); err != nil {
+		close(doneCh)
 		return fmt.Errorf("unable to add proxy objects: %v", err)
 	}
 
 	go func() {
 		<-doneCh
+		fmt.Println("disposing:", r.Name())
 		w.RemoveRotator(r)
 	}()
 
@@ -234,7 +253,7 @@ func (w *webserver) listAndAddRotators() error {
 
 	for _, service := range services {
 		fmt.Println("found:", service.Name)
-		if !isRotator(service.Name, w.station) {
+		if !isRotator(service.Name) {
 			continue
 		}
 		if err := w.addRotator(service.Name); err != nil {
@@ -245,13 +264,8 @@ func (w *webserver) listAndAddRotators() error {
 	return nil
 }
 
-// isRotator checks a serviceName string if it is a shackbus
-// rotator for the selected station
-func isRotator(serviceName, station string) bool {
-
-	if !strings.Contains(serviceName, station) {
-		return false
-	}
+// isRotator checks a serviceName string if it is a shackbus rotator
+func isRotator(serviceName string) bool {
 
 	if !strings.Contains(serviceName, "shackbus.rotator.") {
 		return false
@@ -272,13 +286,10 @@ func (w *webserver) watchRegistry() {
 	for {
 		res, err := watcher.Next()
 		if err != nil {
-			// in case of a timeout (which most likely is a disconnect)
-			// close the application
-			fmt.Println(err)
-			os.Exit(1)
+			log.Println("watch error:", err)
 		}
 
-		if !isRotator(res.Service.Name, w.station) {
+		if !isRotator(res.Service.Name) {
 			continue
 		}
 

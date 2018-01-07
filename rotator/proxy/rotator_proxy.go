@@ -36,7 +36,7 @@ type Proxy struct {
 	wsWriteMutex   sync.Mutex
 	wsTxTimeout    time.Duration
 	wsRxTimeout    time.Duration
-	eventHandler   func(rotator.Rotator, rotator.Event, ...interface{})
+	eventHandler   func(rotator.Rotator, rotator.Status)
 	name           string
 	azimuthMin     int
 	azimuthMax     int
@@ -78,7 +78,7 @@ func DoneCh(ch chan struct{}) func(*Proxy) {
 
 // EventHandler sets a callback function through which the proxy rotator
 // will report Events
-func EventHandler(h func(rotator.Rotator, rotator.Event, ...interface{})) func(*Proxy) {
+func EventHandler(h func(rotator.Rotator, rotator.Status)) func(*Proxy) {
 	return func(r *Proxy) {
 		r.eventHandler = h
 	}
@@ -162,25 +162,25 @@ func New(opts ...func(*Proxy)) (*Proxy, error) {
 				if r.azimuth != s.Azimuth {
 					r.azimuth = s.Azimuth
 					if r.eventHandler != nil {
-						go r.eventHandler(r, rotator.Azimuth, s)
+						go r.eventHandler(r, s)
 					}
 				}
 				if r.azPreset != s.AzPreset {
 					r.azPreset = s.AzPreset
 					if r.eventHandler != nil {
-						go r.eventHandler(r, rotator.Azimuth, s)
+						go r.eventHandler(r, s)
 					}
 				}
 				if r.elevation != s.Elevation {
 					r.elevation = s.Elevation
 					if r.eventHandler != nil {
-						go r.eventHandler(r, rotator.Elevation, s)
+						go r.eventHandler(r, s)
 					}
 				}
 				if r.elPreset != s.ElPreset {
 					r.elPreset = s.ElPreset
 					if r.eventHandler != nil {
-						go r.eventHandler(r, rotator.Elevation, s)
+						go r.eventHandler(r, s)
 					}
 				}
 				r.Unlock()

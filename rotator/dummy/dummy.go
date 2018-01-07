@@ -12,7 +12,7 @@ import (
 // for testing purposes
 type Dummy struct {
 	sync.RWMutex
-	eventHandler   func(rotator.Rotator, rotator.Event, ...interface{})
+	eventHandler   func(rotator.Rotator, rotator.Status)
 	name           string
 	azimuthMin     int
 	azimuthMax     int
@@ -107,7 +107,7 @@ func ElevationSpeed(speed int) func(*Dummy) {
 
 // EventHandler sets a callback function through which the rotator
 // will report Event
-func EventHandler(h func(rotator.Rotator, rotator.Event, ...interface{})) func(*Dummy) {
+func EventHandler(h func(rotator.Rotator, rotator.Status)) func(*Dummy) {
 	return func(r *Dummy) {
 		r.eventHandler = h
 	}
@@ -325,7 +325,7 @@ func (r *Dummy) StopAzimuth() error {
 
 	r.azPreset = r.azimuth
 	if r.eventHandler != nil {
-		r.eventHandler(r, rotator.Azimuth, r.status())
+		r.eventHandler(r, r.status())
 	}
 
 	return nil
@@ -338,7 +338,7 @@ func (r *Dummy) StopElevation() error {
 
 	r.elPreset = r.elevation
 	if r.eventHandler != nil {
-		r.eventHandler(r, rotator.Elevation, r.status())
+		r.eventHandler(r, r.status())
 	}
 	return nil
 }
@@ -352,8 +352,7 @@ func (r *Dummy) Stop() error {
 	r.azPreset = r.azimuth
 	if r.eventHandler != nil {
 		status := r.status()
-		r.eventHandler(r, rotator.Azimuth, status)
-		r.eventHandler(r, rotator.Elevation, status)
+		r.eventHandler(r, status)
 	}
 
 	return nil
@@ -447,7 +446,7 @@ func (r *Dummy) updateAzimuth() {
 	if r.hasAzimuth {
 		changed := r.calcNewAzHeading()
 		if changed {
-			r.eventHandler(r, rotator.Azimuth, r.status())
+			r.eventHandler(r, r.status())
 		}
 	}
 }
@@ -457,7 +456,7 @@ func (r *Dummy) updateElevation() {
 	if r.hasElevation {
 		changed := r.calcNewElHeading()
 		if changed {
-			r.eventHandler(r, rotator.Elevation, r.status())
+			r.eventHandler(r, r.status())
 		}
 	}
 }

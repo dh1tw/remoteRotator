@@ -2,15 +2,6 @@ package rotator
 
 //go:generate stringer -type=Event
 
-// Event represents events which are emitted from the rotator
-type Event int
-
-// Events send from a rotator
-const (
-	Azimuth   Event = iota // sending as value Status{}
-	Elevation              // sending as value Status{}
-)
-
 // Rotator is the interface which has to be implemented by each Rotator
 type Rotator interface {
 	Name() string
@@ -71,3 +62,6 @@ type Info struct {
 	Elevation      int    `json:"elevation"`
 	ElPreset       int    `json:"el_preset"`
 }
+
+// EventHandler is called whenever a variable of a rotator changes
+type EventHandler func(Rotator, Status)

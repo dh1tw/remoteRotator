@@ -2,36 +2,50 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 	"time"
 
-	micro "github.com/micro/go-micro"
+	"github.com/dh1tw/remoteRotator/rotator"
+	sbRotator "github.com/dh1tw/remoteRotator/sb_rotator"
+	"github.com/gogo/protobuf/proto"
+	"github.com/micro/go-micro"
 	"github.com/micro/go-micro/broker"
-	"github.com/micro/go-micro/registry"
-	"github.com/micro/go-micro/transport"
+	"github.com/micro/go-micro/server"
 	natsBroker "github.com/micro/go-plugins/broker/nats"
 	natsReg "github.com/micro/go-plugins/registry/nats"
 	natsTr "github.com/micro/go-plugins/transport/nats"
+	"github.com/nats-io/nats"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
-	sbRotator "github.com/dh1tw/remoteRotator/sb_rotator"
-
-	"github.com/dh1tw/remoteRotator/rotator"
-	"github.com/dh1tw/remoteRotator/rotator/dummy"
-	"github.com/dh1tw/remoteRotator/rotator/yaesu"
 	// _ "net/http/pprof"
 )
 
 var natsServerCmd = &cobra.Command{
 	Use:   "nats",
-	Short: "nats",
-	Long:  ``,
-	Run:   natsServer,
+	Short: "expose your rotator via a nats broker",
+	Long: `
+The nats server allows you to expose a rotator on a nats.io broker. The broker
+can be located within your local lan or somewhere on the internet.
+
+You can select the following rotator types: 
+1. Yaesu (GS232 compatible)
+2. Dummy (great for testing)
+
+remoteRotator allows to assign a series of meta data to a rotator:
+1. Name
+2. Azimuth/Elevation minimum value
+3. Azimuth/Elevation maximum value
+4. Azimuth Mechanical stop
+
+These metadata enhance the rotators view (e.g. showing overlap) in the web 
+interface and can also help to limit for example the rotators range if it does 
+not support full 360°.
+
+`,
+	Run: natsServer,
 }
 
 func init() {
@@ -49,7 +63,6 @@ func init() {
 	natsServerCmd.Flags().IntP("azimuth-stop", "", 0, "metadata: mechanical azimuth stop (in deg)")
 	natsServerCmd.Flags().IntP("elevation-min", "", 0, "metadata: minimum elevation (in deg)")
 	natsServerCmd.Flags().IntP("elevation-max", "", 180, "metadata: maximum elevation (in deg)")
-	natsServerCmd.Flags().StringP("station", "X", "mystation", "Your station callsign")
 	natsServerCmd.Flags().StringP("broker-url", "u", "localhost", "Broker URL")
 	natsServerCmd.Flags().IntP("broker-port", "p", 4222, "Broker Port")
 	natsServerCmd.Flags().StringP("password", "P", "", "NATS Password")
@@ -84,153 +97,86 @@ func natsServer(cmd *cobra.Command, args []string) {
 	viper.BindPFlag("rotator.azimuth-stop", cmd.Flags().Lookup("azimuth-stop"))
 	viper.BindPFlag("rotator.elevation-min", cmd.Flags().Lookup("elevation-min"))
 	viper.BindPFlag("rotator.elevation-max", cmd.Flags().Lookup("elevation-max"))
-	viper.BindPFlag("shackbus.station", cmd.Flags().Lookup("station"))
 	viper.BindPFlag("nats.broker-url", cmd.Flags().Lookup("broker-url"))
 	viper.BindPFlag("nats.broker-port", cmd.Flags().Lookup("broker-port"))
 	viper.BindPFlag("nats.password", cmd.Flags().Lookup("password"))
 	viper.BindPFlag("nats.username", cmd.Flags().Lookup("username"))
 
-	if len(viper.GetString("rotator.name")) == 0 {
-		log.Println("rotator name must not be empty")
+	if err := sanityCheckRotatorInputs(); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	if viper.GetBool("rotator.has-azimuth") {
-
-		if viper.GetInt("rotator.azimuth-min") >= viper.GetInt("rotator.azimuth-max") {
-			log.Println("azimuth-min must be smaller than azimuth-max")
-			os.Exit(1)
-		}
-
-		if viper.GetInt("rotator.azimuth-max") > 360 && viper.GetInt("rotator.azimuth-min") > 360 {
-			log.Println("if azimuth-max is >360, azimuth-min must be < 360")
-			os.Exit(1)
-		}
-
-		if viper.GetInt("rotator.azimuth-min") < 0 {
-			log.Println("azimuth-min must be >= 0")
-			os.Exit(1)
-		}
-
-		if viper.GetInt("rotator.azimuth-max") > 500 {
-			log.Println("azimuth-min must be <= 500")
-			os.Exit(1)
-		}
+	if err := sanityCheckDiscovery(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
-	if viper.GetBool("rotator.has-elevation") {
-
-		if viper.GetInt("rotator.elevation-min") < 0 {
-			log.Println("elevation-min must be >= 0")
-			os.Exit(1)
-		}
-
-		if viper.GetInt("rotator.elevation-max") > 180 {
-			log.Println("elevation-min must be <= 180")
-			os.Exit(1)
-		}
-	}
-
+	// Profiling (uncomment if needed)
 	// go func() {
 	// 	log.Println(http.ListenAndServe("0.0.0.0:6060", http.DefaultServeMux))
 	// }()
 
-	bcast := make(chan rotator.Status, 10)
-
-	var yaesuEventHandler = func(r rotator.Rotator, ev rotator.Event, value ...interface{}) {
-		// fmt.Println(ev, value)
-		switch ev {
-		case rotator.Azimuth, rotator.Elevation:
-			if len(value) == 0 {
-				return
-			}
-			switch value[0].(type) {
-			case rotator.Status:
-				bcast <- value[0].(rotator.Status)
-			}
-		default:
-			log.Printf("unknown event: %v with value(s): %v\n", ev, value)
-		}
-	}
+	// struct which holds the rotator.Rotator instance, implements the
+	// RPC Service methods and publishes changes via the Broker
+	rpcRot := &rpcRotator{}
 
 	rotatorError := make(chan struct{})
 
-	var r rotator.Rotator
-
-	switch strings.ToUpper(viper.GetString("rotator.type")) {
-
-	case "YAESU":
-		evHandler := yaesu.EventHandler(yaesuEventHandler)
-		name := yaesu.Name(viper.GetString("rotator.name"))
-		interval := yaesu.UpdateInterval(viper.GetDuration("rotator.pollingrate"))
-		spPortName := yaesu.Portname(viper.GetString("rotator.portname"))
-		baudrate := yaesu.Baudrate(viper.GetInt("rotator.baudrate"))
-		hasAzimuth := yaesu.HasAzimuth(viper.GetBool("rotator.has-azimuth"))
-		hasElevation := yaesu.HasElevation(viper.GetBool("rotator.has-elevation"))
-		azMin := yaesu.AzimuthMin(viper.GetInt("rotator.azimuth-min"))
-		azMax := yaesu.AzimuthMax(viper.GetInt("rotator.azimuth-max"))
-		elMin := yaesu.ElevationMin(viper.GetInt("rotator.elevation-min"))
-		elMax := yaesu.ElevationMax(viper.GetInt("rotator.elevation-max"))
-		azStop := yaesu.AzimuthStop(viper.GetInt("rotator.azimuth-stop"))
-		errorCh := yaesu.ErrorCh(rotatorError)
-
-		yaesu, err := yaesu.New(name, interval, evHandler,
-			spPortName, baudrate, hasAzimuth, hasElevation, azMin, azMax, elMin,
-			elMax, azStop, errorCh)
-		if err != nil {
-			fmt.Println("unable to initialize YAESU rotator:", err)
-			os.Exit(1)
-		}
-		r = yaesu
-
-	case "DUMMY":
-		evHandler := dummy.EventHandler(yaesuEventHandler)
-		name := dummy.Name(viper.GetString("rotator.name"))
-		hasAzimuth := dummy.HasAzimuth(viper.GetBool("rotator.has-azimuth"))
-		hasElevation := dummy.HasElevation(viper.GetBool("rotator.has-elevation"))
-		azMin := dummy.AzimuthMin(viper.GetInt("rotator.azimuth-min"))
-		azMax := dummy.AzimuthMax(viper.GetInt("rotator.azimuth-max"))
-		elMin := dummy.ElevationMin(viper.GetInt("rotator.elevation-min"))
-		elMax := dummy.ElevationMax(viper.GetInt("rotator.elevation-max"))
-		azStop := dummy.AzimuthStop(viper.GetInt("rotator.azimuth-stop"))
-
-		dummyRotator, err := dummy.New(name, evHandler, hasAzimuth, hasElevation, azMin, azMax, azStop, elMin, elMax)
-		if err != nil {
-			fmt.Println("unable to initialize Dummy rotator:", err)
-			os.Exit(1)
-		}
-
-		r = dummyRotator
-
-	default:
-		log.Printf("unknown rotator type (%v)\n", viper.GetString("rotator.type"))
+	// initialize our Rotator
+	r, err := initRotator(viper.GetString("rotator.type"), rpcRot.PublishState, rotatorError)
+	if err != nil {
+		fmt.Println("unable to initialize rotator:", err)
 		os.Exit(1)
 	}
 
-	serviceName := fmt.Sprintf("%s.shackbus.rotator.%s",
-		viper.GetString("shackbus.station"),
-		viper.GetString("rotator.name"))
+	serviceName := fmt.Sprintf("shackbus.rotator.%s", viper.GetString("rotator.name"))
 
 	username := viper.GetString("nats.username")
 	password := viper.GetString("nats.password")
-	credentials := ""
-	if len(username) > 0 && len(password) > 0 {
-		credentials = fmt.Sprintf("%s:%s@", username, password)
-	}
 	url := viper.GetString("nats.broker-url")
 	port := viper.GetInt("nats.broker-port")
-	addr := fmt.Sprintf("nats://%s%s:%v", credentials, url, port)
+	addr := fmt.Sprintf("nats://%s:%v", url, port)
 
-	regTimeout := registry.Timeout(time.Millisecond * 200)
+	// start from default nats config and add the common options
+	nopts := nats.GetDefaultOptions()
+	nopts.Servers = []string{addr}
+	nopts.User = username
+	nopts.Password = password
 
-	reg := natsReg.NewRegistry(registry.Addrs(addr), regTimeout)
-	tr := natsTr.NewTransport(transport.Addrs(addr))
-	br := natsBroker.NewBroker(broker.Addrs(addr))
+	regNatsOpts := nopts
+	brNatsOpts := nopts
+	trNatsOpts := nopts
+	// we want to set the nats.Options.Name so that we can distinguish
+	// them when monitoring the nats server with nats-top
+	regNatsOpts.Name = serviceName + ":registry"
+	brNatsOpts.Name = serviceName + ":broker"
+	trNatsOpts.Name = serviceName + ":transport"
 
+	// create instances of our nats Registry, Broker and Transport
+	reg := natsReg.NewRegistry(natsReg.Options(regNatsOpts))
+	br := natsBroker.NewBroker(natsBroker.Options(brNatsOpts))
+	tr := natsTr.NewTransport(natsTr.Options(trNatsOpts))
+
+	// this is a workaround since we must set server.Address with the
+	// sanitized version of our service name. The server.Address will be
+	// used in nats as the topic on which the server (transport) will be
+	// listening on.
+	svr := server.NewServer(
+		server.Name(serviceName),
+		server.Address(validateSubject(serviceName)),
+		server.Transport(tr),
+		server.Registry(reg),
+		server.Broker(br),
+	)
+
+	// version is typically defined through a git tag and injected during
+	// compilation; if not, just set it to "dev"
 	if version == "" {
 		version = "dev"
 	}
 
+	// let's create the new rotator service
 	rs := micro.NewService(
 		micro.Name(serviceName),
 		micro.RegisterInterval(time.Second*10),
@@ -238,36 +184,27 @@ func natsServer(cmd *cobra.Command, args []string) {
 		micro.Transport(tr),
 		micro.Registry(reg),
 		micro.Version(version),
+		micro.Server(svr),
 	)
 
+	// initalize our service
 	rs.Init()
 
-	if err := br.Init(); err != nil {
-		log.Println(err)
-	}
+	rpcRot.rotator = r
+	rpcRot.service = rs
+	rpcRot.pubSubTopic = fmt.Sprintf("%s.state", serviceName)
 
-	if err := br.Connect(); err != nil {
-		log.Println(err)
-		os.Exit(1)
-	}
+	// register our Rotator RPC handler
+	sbRotator.RegisterRotatorHandler(rs.Server(), rpcRot)
 
-	rpcr := rpcRotator{
-		rotator:     r,
-		service:     rs,
-		broker:      br,
-		pubSubTopic: fmt.Sprintf("%s.state", serviceName),
-	}
-
-	sbRotator.RegisterRotatorHandler(rs.Server(), &rpcr)
+	rpcRot.initialized = true
 
 	go func() {
 		for {
 			select {
-			case newState := <-bcast:
-				rpcr.PublishState(newState)
 			case <-rotatorError:
 				rs.Server().Stop()
-				return
+				os.Exit(1)
 			}
 		}
 	}()
@@ -279,20 +216,26 @@ func natsServer(cmd *cobra.Command, args []string) {
 }
 
 type rpcRotator struct {
+	initialized bool
 	service     micro.Service
 	rotator     rotator.Rotator
-	broker      broker.Broker
 	pubSubTopic string
 }
 
-func (r *rpcRotator) PublishState(status rotator.Status) {
+func (r *rpcRotator) PublishState(rot rotator.Rotator, status rotator.Status) {
+
+	if !r.initialized {
+		return
+	}
+
 	state := sbRotator.State{
 		Azimuth:         int32(status.Azimuth),
 		AzimuthPreset:   int32(status.AzPreset),
 		Elevation:       int32(status.Elevation),
 		ElevationPreset: int32(status.ElPreset),
 	}
-	data, err := json.Marshal(state)
+
+	data, err := proto.Marshal(&state)
 	if err != nil {
 		log.Println(err)
 	}
@@ -301,20 +244,14 @@ func (r *rpcRotator) PublishState(status rotator.Status) {
 		Body: data,
 	}
 
-	if err := r.broker.Publish(r.pubSubTopic, &msg); err != nil {
+	if err := r.service.Options().Broker.Publish(r.pubSubTopic, &msg); err != nil {
 		log.Println(err)
-		r.shutdown()
 	}
 }
 
-func (r *rpcRotator) shutdown() {
-	r.service.Server().Stop()
-	os.Exit(1)
-}
-
+//implementation of the RPC shackbus.Rotator.Rotator Service
 func (r *rpcRotator) SetAzimuth(ctx context.Context, req *sbRotator.HeadingReq, resp *sbRotator.None) error {
 	if r.rotator.HasAzimuth() {
-		fmt.Printf("setting azimuth to %v\n", req.Heading)
 		err := r.rotator.SetAzimuth(int(req.Heading))
 		return err
 	}
