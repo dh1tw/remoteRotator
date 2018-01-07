@@ -192,7 +192,7 @@ func natsServer(cmd *cobra.Command, args []string) {
 
 	rpcRot.rotator = r
 	rpcRot.service = rs
-	rpcRot.pubSubTopic = fmt.Sprintf("%s.state", serviceName)
+	rpcRot.pubSubTopic = fmt.Sprintf("%s.state", strings.Replace(serviceName, " ", "_", -1))
 
 	// register our Rotator RPC handler
 	sbRotator.RegisterRotatorHandler(rs.Server(), rpcRot)

@@ -13,9 +13,9 @@ func sanityCheckRotatorInputs() error {
 		return fmt.Errorf("rotator name must not be empty")
 	}
 
-	forbiddenChars := "./\\"
+	forbiddenChars := "./\\_"
 	if strings.ContainsAny(viper.GetString("rotator.name"), forbiddenChars) {
-		return fmt.Errorf("rotator name must not contain '.' or '/' characters")
+		return fmt.Errorf("rotator name must not contain '.', '/', '\\', '_' characters")
 	}
 
 	if viper.GetBool("rotator.has-azimuth") {

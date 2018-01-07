@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/micro/go-micro/broker"
@@ -86,6 +87,7 @@ func webServer(cmd *cobra.Command, args []string) {
 		nopts.Servers = []string{fmt.Sprintf("%s:%d", url, port)}
 		nopts.User = username
 		nopts.Password = password
+		nopts.Timeout = time.Second * 10
 
 		disconnectedHdlr := func(conn *nats.Conn) {
 			log.Println("connection to nats broker closed")
@@ -128,7 +130,11 @@ func webServer(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	w := webserver{h, cl}
+	cache := &serviceCache{
+		ttl:   time.Second * 20,
+		cache: make(map[string]time.Time),
+	}
+	w := webserver{h, cl, cache}
 
 	// will be closed when an error occures in the webserver goroutine
 	webserverErrorCh := make(chan struct{})
@@ -184,9 +190,16 @@ func webServer(cmd *cobra.Command, args []string) {
 	}
 }
 
+type serviceCache struct {
+	sync.Mutex
+	ttl   time.Duration
+	cache map[string]time.Time
+}
+
 type webserver struct {
 	*hub.Hub
-	cli client.Client
+	cli   client.Client
+	cache *serviceCache
 }
 
 var bcast = make(chan rotator.Status, 10)
@@ -218,7 +231,7 @@ func (w *webserver) addRotator(rotatorServiceName string) error {
 	cli := sbProxy.Client(w.cli)
 	eh := sbProxy.EventHandler(ev)
 	name := sbProxy.Name(rotatorName)
-	serviceName := sbProxy.ServiceName(rotatorServiceName)
+	serviceName := sbProxy.ServiceName(strings.Replace(rotatorServiceName, " ", "_", -1))
 
 	// create new rotator proxy object
 	r, err := sbProxy.New(done, cli, eh, name, serviceName)
@@ -293,23 +306,46 @@ func (w *webserver) watchRegistry() {
 			continue
 		}
 
-		if res.Action == "create" {
+		switch res.Action {
+
+		case "create", "update":
 			if err := w.addRotator(res.Service.Name); err != nil {
 				log.Println(err)
 			}
-		}
+			w.cache.Lock()
+			w.cache.cache[res.Service.Name] = time.Now()
+			w.cache.Unlock()
 
-		if res.Action == "delete" {
+		case "delete":
 			rotatorName := nameFromFQSN(res.Service.Name)
 			r, exists := w.Rotator(rotatorName)
 			if !exists {
 				continue
 			}
 			r.Close()
+
+			w.cache.Lock()
+			delete(w.cache.cache, res.Service.Name)
+			w.cache.Unlock()
 		}
+
+		w.cache.Lock()
+		for service, timeout := range w.cache.cache {
+			if time.Since(timeout) >= w.cache.ttl {
+				rotatorName := nameFromFQSN(service)
+				r, exists := w.Rotator(rotatorName)
+				if !exists {
+					continue
+				}
+				r.Close()
+				delete(w.cache.cache, res.Service.Name)
+			}
+		}
+		w.cache.Unlock()
 	}
 }
 
+// used only for lan rotators / discovery
 func (w *webserver) update() {
 
 	dsvrdRotators, err := discovery.LookupRotators()
@@ -348,5 +384,4 @@ func (w *webserver) update() {
 			w.RemoveRotator(r)
 		}()
 	}
-
 }

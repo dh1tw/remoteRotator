@@ -2,6 +2,7 @@ package sbProxy
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/dh1tw/remoteRotator/rotator"
@@ -32,7 +33,7 @@ type SbProxy struct {
 	doneCh         chan struct{}
 	doneOnce       sync.Once
 	subscriber     broker.Subscriber
-	serviceName    string
+	serviceName    string //better call it address (?)
 }
 
 func Client(cli client.Client) func(*SbProxy) {
@@ -82,6 +83,7 @@ func New(opts ...func(*SbProxy)) (*SbProxy, error) {
 		opt(r)
 	}
 
+	fmt.Println("serviceName is:", r.serviceName)
 	r.rcli = sbRotator.NewRotatorClient(r.serviceName, r.cli)
 
 	if err := r.getInfo(); err != nil {
