@@ -1,7 +1,5 @@
 package rotator
 
-//go:generate stringer -type=Event
-
 // Rotator is the interface which has to be implemented by each Rotator
 type Rotator interface {
 	Name() string
