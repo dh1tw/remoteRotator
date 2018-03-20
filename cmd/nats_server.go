@@ -107,11 +107,6 @@ func natsServer(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	if err := sanityCheckDiscovery(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
 	// Profiling (uncomment if needed)
 	// go func() {
 	// 	log.Println(http.ListenAndServe("0.0.0.0:6060", http.DefaultServeMux))
@@ -130,6 +125,7 @@ func natsServer(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
+	// better call this Addrs(?)
 	serviceName := fmt.Sprintf("shackbus.rotator.%s", viper.GetString("rotator.name"))
 
 	username := viper.GetString("nats.username")

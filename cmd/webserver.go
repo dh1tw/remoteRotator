@@ -142,13 +142,12 @@ func webServer(cmd *cobra.Command, args []string) {
 	// launch webserver
 	go w.ListenHTTP(viper.GetString("web.host"), viper.GetInt("web.port"), webserverErrorCh)
 
-	// at startup query the registry and add all found rotators
-	if err := w.listAndAddRotators(); err != nil {
-		log.Println(err)
-	}
-
 	// watch the registry in a seperate thread for changes
 	if sbTransport == "nats" {
+		// at startup query the registry and add all found rotators
+		if err := w.listAndAddRotators(); err != nil {
+			log.Println(err)
+		}
 		go w.watchRegistry()
 	}
 

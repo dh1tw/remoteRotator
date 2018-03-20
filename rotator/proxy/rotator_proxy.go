@@ -192,9 +192,9 @@ func New(opts ...func(*Proxy)) (*Proxy, error) {
 }
 
 func (r *Proxy) Close() {
-	if r.conn != nil {
-		r.conn.Close()
-	}
+	// if r.conn != nil {
+	// 	r.conn.Close()
+	// }
 }
 
 func (r *Proxy) getInfo() error {
