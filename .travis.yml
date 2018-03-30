@@ -9,13 +9,13 @@ matrix:
     - GIMME_OS=linux
       GIMME_ARCH=amd64
       HOST_OS=linux
-    go: 1.10
+    go: "1.10"
   - os: linux
     env:
     - GIMME_OS=linux
     - GIMME_ARCH=386
     - HOST_OS=linux
-    go: 1.10
+    go: "1.10"
   - os: linux
     env:
     - GIMME_OS=linux
