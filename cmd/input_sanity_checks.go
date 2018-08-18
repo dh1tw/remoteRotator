@@ -33,7 +33,7 @@ func sanityCheckRotatorInputs() error {
 		}
 
 		if viper.GetInt("rotator.azimuth-max") > 500 {
-			return fmt.Errorf("azimuth-min must be <= 500")
+			return fmt.Errorf("azimuth-max must be <= 500")
 		}
 	}
 
