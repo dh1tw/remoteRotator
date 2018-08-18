@@ -1,7 +1,6 @@
 package hub
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -11,7 +10,7 @@ import (
 	"github.com/GeertJohan/go.rice"
 
 	"github.com/dh1tw/remoteRotator/rotator"
-	"github.com/gorilla/websocket"
+	"github.com/gorilla/mux"
 )
 
 // Hub is a struct which makes a rotator available through network
@@ -72,8 +71,8 @@ func (hub *Hub) addRotator(r rotator.Rotator) error {
 	}
 	hub.rotators[r.Name()] = r
 	ev := Event{
-		Name:    AddRotator,
-		Rotator: r.Info(),
+		Name:        AddRotator,
+		RotatorName: r.Name(),
 	}
 	if err := hub.broadcastToWsClients(ev); err != nil {
 		fmt.Println(err)
@@ -89,8 +88,8 @@ func (hub *Hub) RemoveRotator(r rotator.Rotator) {
 	defer hub.Unlock()
 
 	ev := Event{
-		Name:    RemoveRotator,
-		Rotator: r.Info(),
+		Name:        RemoveRotator,
+		RotatorName: r.Name(),
 	}
 
 	if err := hub.broadcastToWsClients(ev); err != nil {
@@ -168,8 +167,11 @@ func (hub *Hub) addWsClient(client *WsClient) {
 	}
 	hub.wsClients[client] = true
 
+	// we need to listen on the websocket so that the incoming ping
+	// messages can be (automatically) answered (with a pong message)
+	go client.listen(hub.closeWsClient)
+
 	log.Printf("websocket client connected (%v)\n", client.RemoteAddr())
-	go client.listen(hub, hub.closeWsClient)
 }
 
 // removeWsClient removes a websocket client
@@ -218,57 +220,6 @@ func (hub *Hub) ListenTCP(host string, port int, tcpError chan<- bool) {
 	}
 }
 
-func (hub *Hub) wsHandler(w http.ResponseWriter, r *http.Request) {
-
-	upgrader := websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-	}
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	c := &WsClient{
-		Conn: conn,
-	}
-
-	hub.RLock()
-	for _, r := range hub.rotators {
-		ev := Event{
-			Name:    AddRotator,
-			Rotator: r.Info(),
-		}
-		if err := c.write(ev); err != nil {
-			fmt.Println(err)
-		}
-	}
-	hub.RUnlock()
-
-	hub.addWsClient(c)
-}
-
-func (hub *Hub) infoHandler(w http.ResponseWriter, r *http.Request) {
-
-	hub.RLock()
-	defer hub.RUnlock()
-
-	i := []rotator.Info{}
-
-	for _, r := range hub.rotators {
-		i = append(i, r.Info())
-	}
-
-	data, err := json.Marshal(i)
-	if err != nil {
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, string(data))
-}
-
 // ListenHTTP starts a HTTP Server on a given network adapter / port and
 // sets a HTTP and Websocket handler.
 // Since this function contains an endless loop, it should be executed
@@ -281,14 +232,21 @@ func (hub *Hub) ListenHTTP(host string, port int, errorCh chan<- struct{}) {
 	box := rice.MustFindBox("../html")
 	fileServer := http.FileServer(box.HTTPBox())
 
-	http.Handle("/", fileServer)
-	http.HandleFunc("/info", hub.infoHandler)
-	http.HandleFunc("/ws", hub.wsHandler)
+	router := mux.NewRouter().StrictSlash(true)
+	router.HandleFunc("/api/rotators", hub.rotatorsHandler).Methods("GET")
+	router.HandleFunc("/api/rotator/{rotator}", hub.rotatorHandler).Methods("GET")
+	router.HandleFunc("/api/rotator/{rotator}/azimuth", hub.azimuthHandler)
+	router.HandleFunc("/api/rotator/{rotator}/elevation", hub.elevationHandler)
+	router.HandleFunc("/api/rotator/{rotator}/stop", hub.stopHandler)
+	router.HandleFunc("/api/rotator/{rotator}/stop_azimuth", hub.stopAzimuthHandler)
+	router.HandleFunc("/api/rotator/{rotator}/stop_elevation", hub.stopElevationHandler)
+	router.HandleFunc("/ws", hub.wsHandler)
+	router.PathPrefix("/").Handler(fileServer)
 
 	// Listen for incoming connections.
 	log.Printf("listening on %s:%d for HTTP connections\n", host, port)
 
-	err := http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), nil)
+	err := http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), router)
 	if err != nil {
 		log.Println(err)
 		return
@@ -296,13 +254,13 @@ func (hub *Hub) ListenHTTP(host string, port int, errorCh chan<- struct{}) {
 }
 
 // Broadcast sends a rotator Status struct to all connected clients
-func (hub *Hub) Broadcast(s rotator.Status) {
+func (hub *Hub) Broadcast(h rotator.Heading) {
 
-	hub.BroadcastToTCPClients(s)
+	hub.BroadcastToTCPClients(h)
 
 	ev := Event{
-		Name:   UpdateHeading,
-		Status: s,
+		Name:    UpdateHeading,
+		Heading: h,
 	}
 	if err := hub.BroadcastToWsClients(ev); err != nil {
 		log.Println(err)
@@ -311,7 +269,8 @@ func (hub *Hub) Broadcast(s rotator.Status) {
 
 // BroadcastToTCPClients will send a rotator.Status struct to all connected
 // TCP Clients
-func (hub *Hub) BroadcastToTCPClients(s rotator.Status) {
+func (hub *Hub) BroadcastToTCPClients(s rotator.Heading) {
+	// Lock needed for writing to the tcp socket
 	hub.Lock()
 	defer hub.Unlock()
 
@@ -330,10 +289,9 @@ func (hub *Hub) BroadcastToTCPClients(s rotator.Status) {
 }
 
 type Event struct {
-	Name     RotatorEvent   `json:"name,omitempty"`
-	Rotator  rotator.Info   `json:"rotator,omitempty"`
-	Rotators []rotator.Info `json:"rotators,omitempty"`
-	Status   rotator.Status `json:"status,omitempty"`
+	Name        RotatorEvent    `json:"name,omitempty"`
+	RotatorName string          `json:"rotator_name,omitempty"`
+	Heading     rotator.Heading `json:"heading,omitempty"`
 }
 
 type RotatorEvent string

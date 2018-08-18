@@ -17,7 +17,7 @@ import (
 	natsBroker "github.com/micro/go-plugins/broker/nats"
 	natsReg "github.com/micro/go-plugins/registry/nats"
 	natsTr "github.com/micro/go-plugins/transport/nats"
-	"github.com/nats-io/nats"
+	"github.com/nats-io/go-nats"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	// _ "net/http/pprof"
@@ -30,7 +30,7 @@ var natsServerCmd = &cobra.Command{
 The nats server allows you to expose a rotator on a nats.io broker. The broker
 can be located within your local lan or somewhere on the internet.
 
-You can select the following rotator types: 
+You can select the following rotator types:
 1. Yaesu (GS232 compatible)
 2. Dummy (great for testing)
 
@@ -40,8 +40,8 @@ remoteRotator allows to assign a series of meta data to a rotator:
 3. Azimuth/Elevation maximum value
 4. Azimuth Mechanical stop
 
-These metadata enhance the rotators view (e.g. showing overlap) in the web 
-interface and can also help to limit for example the rotators range if it does 
+These metadata enhance the rotators view (e.g. showing overlap) in the web
+interface and can also help to limit for example the rotators range if it does
 not support full 360°.
 
 `,
@@ -218,17 +218,17 @@ type rpcRotator struct {
 	pubSubTopic string
 }
 
-func (r *rpcRotator) PublishState(rot rotator.Rotator, status rotator.Status) {
+func (r *rpcRotator) PublishState(rot rotator.Rotator, heading rotator.Heading) {
 
 	if !r.initialized {
 		return
 	}
 
 	state := sbRotator.State{
-		Azimuth:         int32(status.Azimuth),
-		AzimuthPreset:   int32(status.AzPreset),
-		Elevation:       int32(status.Elevation),
-		ElevationPreset: int32(status.ElPreset),
+		Azimuth:         int32(heading.Azimuth),
+		AzimuthPreset:   int32(heading.AzPreset),
+		Elevation:       int32(heading.Elevation),
+		ElevationPreset: int32(heading.ElPreset),
 	}
 
 	data, err := proto.Marshal(&state)
@@ -277,22 +277,22 @@ func (r *rpcRotator) StopElevation(ctx context.Context, req *sbRotator.None, res
 }
 
 func (r *rpcRotator) GetMetadata(ctx context.Context, req *sbRotator.None, resp *sbRotator.Metadata) error {
-	info := r.rotator.Info()
-	resp.AzimuthMax = int32(info.AzimuthMax)
-	resp.AzimuthMin = int32(info.AzimuthMin)
-	resp.AzimuthStop = int32(info.AzimuthStop)
-	resp.ElevationMax = int32(info.ElevationMax)
-	resp.ElevationMin = int32(info.ElevationMin)
-	resp.HasAzimuth = info.HasAzimuth
-	resp.HasElevation = info.HasElevation
+	config := r.rotator.Serialize().Config
+	resp.AzimuthMax = int32(config.AzimuthMax)
+	resp.AzimuthMin = int32(config.AzimuthMin)
+	resp.AzimuthStop = int32(config.AzimuthStop)
+	resp.ElevationMax = int32(config.ElevationMax)
+	resp.ElevationMin = int32(config.ElevationMin)
+	resp.HasAzimuth = config.HasAzimuth
+	resp.HasElevation = config.HasElevation
 	return nil
 }
 
 func (r *rpcRotator) GetState(ctx context.Context, req *sbRotator.None, resp *sbRotator.State) error {
-	info := r.rotator.Info()
-	resp.Azimuth = int32(info.Azimuth)
-	resp.AzimuthPreset = int32(info.AzPreset)
-	resp.Elevation = int32(info.Elevation)
-	resp.ElevationPreset = int32(info.ElPreset)
+	heading := r.rotator.Serialize().Heading
+	resp.Azimuth = int32(heading.Azimuth)
+	resp.AzimuthPreset = int32(heading.AzPreset)
+	resp.Elevation = int32(heading.Elevation)
+	resp.ElevationPreset = int32(heading.ElPreset)
 	return nil
 }

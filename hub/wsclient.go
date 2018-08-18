@@ -3,10 +3,7 @@ package hub
 import (
 	"encoding/json"
 	"fmt"
-	"log"
-	"strings"
 
-	"github.com/dh1tw/remoteRotator/rotator"
 	"github.com/gorilla/websocket"
 )
 
@@ -15,45 +12,17 @@ type WsClient struct {
 	*websocket.Conn
 }
 
-func (c *WsClient) listen(hub *Hub, closer chan<- *WsClient) {
+// listen on the websocket. Despite that no data is read, this function
+// is necessary to reply to incoming ping messages.
+func (c *WsClient) listen(closer chan<- *WsClient) {
 	defer func() {
 		closer <- c
 	}()
 
 	for {
-
-		messageType, p, err := c.ReadMessage()
-		if err != nil {
-			if strings.Contains(err.Error(), "(going away)") ||
-				strings.Contains(err.Error(), "(abnormal closure)") {
-				return
-			}
-			log.Printf("websocket read error (%v): %v\n", c.Conn.RemoteAddr(), err)
+		// in case of an error just return and signal closing down of the ws
+		if _, _, err := c.ReadMessage(); err != nil {
 			return
-		}
-
-		if messageType != websocket.TextMessage {
-			continue
-		}
-
-		req := rotator.Request{}
-
-		if err := json.Unmarshal(p, &req); err != nil {
-			log.Printf("websocket json unmarshal error (%v): %v\n", c.RemoteAddr(), err)
-		}
-
-		hub.RLock()
-		r, ok := hub.rotators[req.Name]
-		hub.RUnlock()
-
-		if !ok {
-			fmt.Printf("request for unknown rotator %s\n", req.Name)
-			continue
-		}
-
-		if err := r.ExecuteRequest(req); err != nil {
-			log.Printf("websocket unable to execute request (%v): %v\n", c.RemoteAddr(), err)
-			r.Close()
 		}
 	}
 }
@@ -67,29 +36,6 @@ func (c *WsClient) write(event Event) error {
 	if err := c.WriteMessage(websocket.TextMessage, b); err != nil {
 		return err
 	}
-
-	// switch t := v.(type) {
-	// case rotator.Status:
-	// 	s := []rotator.Status{v.(rotator.Status)}
-	// 	b, err := json.Marshal(s)
-	// 	if err != nil {
-	// 		return fmt.Errorf("unable to serialize msg %v: %v", v, err)
-	// 	}
-	// 	if err := c.WriteMessage(websocket.TextMessage, b); err != nil {
-	// 		return err
-	// 	}
-	// case []rotator.Status:
-	// 	b, err := json.Marshal(v.([]rotator.Status))
-	// 	if err != nil {
-	// 		return fmt.Errorf("unable to serialize msg %v: %v", v, err)
-	// 	}
-	// 	if err := c.WriteMessage(websocket.TextMessage, b); err != nil {
-	// 		return err
-	// 	}
-	// default:
-	// 	log.Printf("no handler for type %v (msg: %v)\n", t, v)
-	// 	return nil
-	// }
 
 	return nil
 }

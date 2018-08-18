@@ -3,13 +3,12 @@ syntax ="proto3";
 package shackbus;
 
 service Rotator{
-    rpc SetAzimuth(HeadingReq) returns (None); 
-    rpc SetElevation(HeadingReq) returns (None); 
+    rpc SetAzimuth(HeadingReq) returns (None);
+    rpc SetElevation(HeadingReq) returns (None);
     rpc StopAzimuth(None) returns (None);
     rpc StopElevation(None) returns (None);
     rpc GetMetadata(None) returns (Metadata);
     rpc GetState(None) returns (State);
-    pubsub State;
 }
 
 message None{}

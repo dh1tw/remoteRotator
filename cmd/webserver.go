@@ -17,7 +17,7 @@ import (
 	natsReg "github.com/micro/go-plugins/registry/nats"
 	"github.com/micro/go-plugins/selector/named"
 	natsTr "github.com/micro/go-plugins/transport/nats"
-	"github.com/nats-io/nats"
+	"github.com/nats-io/go-nats"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -179,10 +179,11 @@ func webServer(cmd *cobra.Command, args []string) {
 			case "lan":
 				go w.update()
 			}
-		case s := <-bcast:
+		case u := <-bcast:
 			ev := hub.Event{
-				Name:   hub.UpdateHeading,
-				Status: s,
+				Name:        hub.UpdateHeading,
+				RotatorName: u.rotatorName, //MISSING
+				Heading:     u.heading,
 			}
 			w.BroadcastToWsClients(ev)
 		}
@@ -201,10 +202,15 @@ type webserver struct {
 	cache *serviceCache
 }
 
-var bcast = make(chan rotator.Status, 10)
+type update struct {
+	rotatorName string
+	heading     rotator.Heading
+}
 
-var ev = func(r rotator.Rotator, status rotator.Status) {
-	bcast <- status
+var bcast = make(chan update, 10)
+
+var ev = func(r rotator.Rotator, heading rotator.Heading) {
+	bcast <- update{r.Name(), heading}
 }
 
 //extract the service's name from its fully qualified service name (FQSN)

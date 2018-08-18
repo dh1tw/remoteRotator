@@ -16,7 +16,7 @@ type SbProxy struct {
 	sync.RWMutex
 	cli            client.Client
 	rcli           sbRotator.RotatorClient
-	eventHandler   func(rotator.Rotator, rotator.Status)
+	eventHandler   func(rotator.Rotator, rotator.Heading)
 	name           string
 	azimuthMin     int
 	azimuthMax     int
@@ -34,41 +34,6 @@ type SbProxy struct {
 	doneOnce       sync.Once
 	subscriber     broker.Subscriber
 	serviceName    string //better call it address (?)
-}
-
-func Client(cli client.Client) func(*SbProxy) {
-	return func(r *SbProxy) {
-		r.cli = cli
-	}
-}
-
-// DoneCh is a functional option allows you to pass a channel to the proxy object.
-// This channel will be closed by this object. It serves as a notification that
-// the object can be deleted.
-func DoneCh(ch chan struct{}) func(*SbProxy) {
-	return func(r *SbProxy) {
-		r.doneCh = ch
-	}
-}
-
-func Name(name string) func(*SbProxy) {
-	return func(r *SbProxy) {
-		r.name = name
-	}
-}
-
-func ServiceName(name string) func(*SbProxy) {
-	return func(r *SbProxy) {
-		r.serviceName = name
-	}
-}
-
-// EventHandler sets a callback function through which the proxy rotator
-// will report Events
-func EventHandler(h func(rotator.Rotator, rotator.Status)) func(*SbProxy) {
-	return func(r *SbProxy) {
-		r.eventHandler = h
-	}
 }
 
 // New returns the pointer to an initalized Rotator proxy object.
@@ -127,17 +92,8 @@ func (r *SbProxy) updateHandler(p broker.Publication) error {
 	r.elevation = int(state.Elevation)
 	r.elPreset = int(state.ElevationPreset)
 
-	status := rotator.Status{
-		Name:           r.name,
-		Azimuth:        r.azimuth,
-		AzPreset:       r.azPreset,
-		AzimuthOverlap: r.azimuthOverlap,
-		Elevation:      r.elevation,
-		ElPreset:       r.elPreset,
-	}
-
 	if r.eventHandler != nil {
-		go r.eventHandler(r, status)
+		go r.eventHandler(r, r.serialize().Heading)
 	}
 
 	return nil
@@ -237,75 +193,36 @@ func (r *SbProxy) Stop() error {
 	return err
 }
 
-func (r *SbProxy) Status() rotator.Status {
+// Serialize the data of the rotator
+func (r *SbProxy) Serialize() rotator.Object {
 	r.RLock()
 	defer r.RUnlock()
-	s := rotator.Status{
-		Azimuth:        r.azimuth,
-		AzPreset:       r.azPreset,
-		AzimuthOverlap: false,
-		Elevation:      r.elevation,
-		ElPreset:       r.elPreset,
-	}
-	return s
+	return r.serialize()
 }
 
-func (r *SbProxy) ExecuteRequest(req rotator.Request) error {
+func (r *SbProxy) serialize() rotator.Object {
 
-	if req.HasAzimuth {
-		if err := r.SetAzimuth(req.Azimuth); err != nil {
-			return err
-		}
+	obj := rotator.Object{
+		Name: r.name,
+		Heading: rotator.Heading{
+			Azimuth:   int(r.azimuth),
+			AzPreset:  int(r.azPreset),
+			Elevation: int(r.elevation),
+			ElPreset:  int(r.elPreset),
+		},
+		Config: rotator.Config{
+			HasAzimuth:   r.hasAzimuth,
+			HasElevation: r.hasElevation,
+			AzimuthMax:   r.azimuthMax,
+			AzimuthMin:   r.azimuthMin,
+			AzimuthStop:  r.azimuthStop,
+			ElevationMax: r.elevationMax,
+			ElevationMin: r.elevationMin,
+		},
 	}
 
-	if req.HasElevation {
-		if err := r.SetElevation(req.Elevation); err != nil {
-			return err
-		}
-	}
-
-	if req.Stop {
-		if err := r.Stop(); err != nil {
-			return err
-		}
-	}
-
-	if req.StopAzimuth {
-		if err := r.StopAzimuth(); err != nil {
-			return err
-		}
-	}
-
-	if req.StopElevation {
-		if err := r.StopElevation(); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return obj
 }
-
-func (r *SbProxy) Info() rotator.Info {
-	r.RLock()
-	defer r.RUnlock()
-	i := rotator.Info{
-		Name:           r.name,
-		HasAzimuth:     r.hasAzimuth,
-		HasElevation:   r.hasElevation,
-		AzimuthMin:     r.azimuthMin,
-		AzimuthMax:     r.azimuthMax,
-		AzimuthStop:    r.azimuthStop,
-		AzimuthOverlap: r.azimuthOverlap,
-		ElevationMin:   r.elevationMin,
-		ElevationMax:   r.elevationMax,
-		Azimuth:        r.azimuth,
-		AzPreset:       r.azPreset,
-		Elevation:      r.elevation,
-		ElPreset:       r.elPreset,
-	}
-	return i
-}
-
 func (r *SbProxy) Close() {
 	if r.subscriber != nil {
 		r.subscriber.Unsubscribe()

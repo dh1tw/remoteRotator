@@ -111,25 +111,25 @@ var AzimuthRotator = {
         mouseDownHandler: function (evt) {
             this.mouseDown = true;
         },
-        
+
         mouseOutHandler: function (evt) {
             this.mouseDown = false;
             this.internalPreset = this.preset;
             this.drawRotator(this.heading, this.internalPreset);
         },
-        
+
         mouseMoveHandler: function (evt) {
-            
+
             // only proceed when the left button is pressed
             // this feature is not supported by the Webkit (Safari) API!
             // see: https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/buttons
             if (evt.buttons !== 1) {
                 return
             }
-            
+
             var angle = this.getMousePosAngle(this.canvas, evt);
             var partially = false;
-            
+
             // determin if the rotator covers >= 360°
             if (this.max > this.min) {
                 this.max - this.min < 360 ? partially = true : partially = false;
@@ -137,11 +137,11 @@ var AzimuthRotator = {
                 var left = 360 - this.min;
                 this.left + this.max < 360 ? partially = true : partially = false;
             }
-            
+
             // // supports only < 360°
             if (partially) {
-                
-                // max does not overlap 0° 
+
+                // max does not overlap 0°
                 if (this.max > this.min) {
                     if (angle < this.min) { // preset is < min (outside of valid range)
                         this.internalPreset = this.min;
@@ -150,27 +150,27 @@ var AzimuthRotator = {
                     } else { // within valid range
                         this.internalPreset = angle;
                     }
-                } else { // max overlapping 0° 
+                } else { // max overlapping 0°
                     if ((angle > this.max) && (angle < this.min)) {
                         this.internalPreset = this.max;
                     } else { // within valid range
                         this.internalPreset = angle;
                     }
                 }
-                
+
             } else {
                 this.internalPreset = angle;
             }
-            
+
             this.drawRotator(this.heading, this.internalPreset);
         },
-        
+
         mouseUpHandler: function (evt) {
             this.mouseDown = false;
             var angle = this.getMousePosAngle(this.canvas, evt);
             this.$emit('set-azimuth', this.name, Math.round(angle, 0));
         },
-        
+
         getMousePosition: function (canvas, evt) {
             var rect = canvas.getBoundingClientRect();
             return {
@@ -178,19 +178,19 @@ var AzimuthRotator = {
                 y: evt.clientY - rect.top
             };
         },
-        
+
         getMousePosAngle: function (canvas, evt) {
             var mousePos = this.getMousePosition(this.canvas, evt);
             var dx = mousePos.x - this.canvas.width / 2;
             var dy = mousePos.y - this.canvas.height / 2;
             var angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
-            
+
             if (angle < 0) {
                 angle += 360;
             }
             return angle;
         },
-        
+
         // draw the heading and preset
         // heading (Number)
         // preset (Number)
@@ -217,7 +217,7 @@ var AzimuthRotator = {
         drawCompass() {
         // draw the base a compass ring with 45° ticks
 
-            var cx = 100 * this.canvasOptions.scale; //canvas x size 
+            var cx = 100 * this.canvasOptions.scale; //canvas x size
             var cy = 100 * this.canvasOptions.scale; //canvas y size
             var r = 45 * this.canvasOptions.scale; //radius
             var font = this.headingFont();
@@ -229,7 +229,7 @@ var AzimuthRotator = {
             var lstx = r - (r * 0.22); //large tick start x
             var lsty = -r + (r * 0.22); //large tick start y
             var letx = r; //large tick end x
-            var lety = -r; //large tick end y    
+            var lety = -r; //large tick end y
             var sstx = r - (r * 0.11); //small tick start x
             var ssty = -r + (r * 0.11); //small tick start y
             var setx = r; //small tick end x
@@ -296,7 +296,7 @@ var AzimuthRotator = {
             var scale = this.canvasOptions.scale;
 
             var color = this.headingNeedleOptions.needleColor;
-            var cx = 100 * scale; //canvas x size 
+            var cx = 100 * scale; //canvas x size
             var cy = 100 * scale; //canvas y size
             var r = 45 * scale; //radius
 
@@ -348,7 +348,7 @@ var AzimuthRotator = {
         drawPreset: function (degrees) {
             var scale = this.canvasOptions.scale;
 
-            var cx = 100 * scale; //canvas x size 
+            var cx = 100 * scale; //canvas x size
             var cy = 100 * scale; //canvas y size
             var r = 45 * scale; //radius
 
@@ -381,7 +381,7 @@ var AzimuthRotator = {
         drawMinMax: function (heading) {
             var scale = this.canvasOptions.scale;
 
-            var cx = 100 * scale; //canvas x size 
+            var cx = 100 * scale; //canvas x size
             var cy = 100 * scale; //canvas y size
             var r = 45 * scale; //radius
 
@@ -407,7 +407,7 @@ var AzimuthRotator = {
         drawOverlap: function (heading) {
             var scale = this.canvasOptions.scale;
 
-            var cx = 100 * scale; //canvas x size 
+            var cx = 100 * scale; //canvas x size
             var cy = 100 * scale; //canvas y size
             var r = 45 * scale; //radius
 
@@ -448,7 +448,7 @@ var AzimuthRotator = {
         drawStop: function () {
             var scale = this.canvasOptions.scale;
 
-            var cx = 100 * scale; //canvas x size 
+            var cx = 100 * scale; //canvas x size
             var cy = 100 * scale; //canvas y size
             var r = 45 * scale; //radius
 
@@ -482,7 +482,7 @@ var AzimuthRotator = {
             if (!this.mouseDown) {
                 this.internalPreset = this.preset;
                 this.drawRotator(this.heading, this.internalPreset);
-            } 
+            }
         },
         min: function () {
             this.drawRotator(this.heading, this.internalPreset);

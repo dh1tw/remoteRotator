@@ -15,14 +15,14 @@
 <body>
   <div id="app">
     <div id="loading" v-bind:class="{'hidden': loading}">
-        <i class="fa fa-spinner fa-spin spinner" aria-hidden="true"></i>
-        <p> Searching for rotators...</p>
+      <i class="fa fa-spinner fa-spin spinner" aria-hidden="true"></i>
+      <p> Searching for rotators...</p>
     </div>
     <div class="main-rotator" v-if="Object.keys(sortedAzRotators).length > 0">
       <div id="azimuth-rotator">
         <rotator-name :name="selectedAzRotator.name" :is-azimuth="true" :width="canvasSize"></rotator-name>
-        <azimuth-rotator v-on:set-azimuth="setAzimuth" :name="selectedAzRotator.name" :heading="selectedAzRotator.azimuth" :preset="selectedAzRotator.az_preset"
-          :overlap="selectedAzRotator.az_overlap" :min="selectedAzRotator.az_min" :max="selectedAzRotator.az_max" :stop="selectedAzRotator.az_stop"
+        <azimuth-rotator v-on:set-azimuth="setAzimuth" :name="selectedAzRotator.name" :heading="selectedAzRotator.heading.azimuth" :preset="selectedAzRotator.heading.az_preset"
+          :overlap="selectedAzRotator.config.az_overlap" :min="selectedAzRotator.config.az_min" :max="selectedAzRotator.config.az_max" :stop="selectedAzRotator.config.az_stop"
           :canvas-size="canvasSize">
         </azimuth-rotator>
         <div class="mini-rotators" v-if="Object.keys(sortedAzRotators).length > 1">
@@ -32,8 +32,8 @@
                 <button type='button' class='btn btn-primary btn-sm mini-rotator-btn' v-bind:class="{active : selectedAzRotator.name == rotator.name }"
                   v-on:click="setAzRotator(rotator.name) ">{{rotator.name}}</button>
                 <div class='mini-rotator-canvas'>
-                  <azimuth-rotator :name="rotator.name" :heading="rotator.azimuth" :preset="rotator.az_preset" v-on:set-azimuth="setAzimuth"
-                    :overlap="rotator.az_overlap" :min="rotator.az_min" :max="rotator.az_max" :stop="rotator.az_stop" :canvas-size=100></azimuth-rotator>
+                  <azimuth-rotator :name="rotator.name" :heading="rotator.heading.azimuth" :preset="rotator.heading.az_preset" v-on:set-azimuth="setAzimuth"
+                    :overlap="rotator.config.az_overlap" :min="rotator.config.az_min" :max="rotator.config.az_max" :stop="rotator.config.az_stop" :canvas-size=100></azimuth-rotator>
                 </div>
               </div>
             </li>
@@ -44,8 +44,8 @@
     <div class="main-rotator" v-if="Object.keys(sortedElRotators).length > 0">
       <div id="elevation-rotator">
         <rotator-name :name="selectedElRotator.name" :width="canvasSize"></rotator-name>
-        <elevation-rotator v-on:set-elevation="setElevation" :name="selectedElRotator.name" :heading="selectedElRotator.elevation"
-          :preset="selectedElRotator.el_preset" :min="selectedElRotator.el_min" :max="selectedElRotator.el_max" :canvas-size="canvasSize">
+        <elevation-rotator v-on:set-elevation="setElevation" :name="selectedElRotator.name" :heading="selectedElRotator.heading.elevation"
+          :preset="selectedElRotator.heading.el_preset" :min="selectedElRotator.config.el_min" :max="selectedElRotator.config.el_max" :canvas-size="canvasSize">
         </elevation-rotator>
         <div class="mini-rotators" v-if="Object.keys(sortedElRotators).length > 1">
           <ul>
@@ -54,8 +54,8 @@
                 <button type='button' class='btn btn-primary btn-sm mini-rotator-btn' v-bind:class="{active : selectedElRotator.name == rotator.name }"
                   v-on:click="setElRotator(rotator.name) ">{{rotator.name}}</button>
                 <div class='mini-rotator-canvas'>
-                  <elevation-rotator :name="rotator.name" :heading="rotator.elevation" :preset="rotator.el_preset" v-on:set-elevation="setElevation"
-                    :min="rotator.el_min" :max="rotator.el_max" :canvas-size=100></elevation-rotator>
+                  <elevation-rotator :name="rotator.name" :heading="rotator.heading.elevation" :preset="rotator.heading.el_preset" v-on:set-elevation="setElevation"
+                    :min="rotator.config.el_min" :max="rotator.config.el_max" :canvas-size=100></elevation-rotator>
                 </div>
               </div>
             </li>
