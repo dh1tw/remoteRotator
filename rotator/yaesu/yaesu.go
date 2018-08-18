@@ -46,10 +46,9 @@ type Yaesu struct {
 	watchdogTs      time.Time
 }
 
-// NewYaesu creates a new Yaesu object which satisfies implicitely the
-// rotator.Rotator interface. Configuration settings are set through functional
-// options. The the Yaesu can not be initialized nil and the corresponding error
-// will be returned.
+// New creates a new Yaesu object which satisfies implicitely the
+// rotator.Rotator interface. Configuration settings can be set through
+// functional options.
 // Default settings are:
 // hasAzimuth: true,
 // portname: /dev/ttyACM0,
@@ -99,7 +98,7 @@ func New(opts ...func(*Yaesu)) (*Yaesu, error) {
 	return r, nil
 }
 
-// Close shutdowns the rotator object and prepares it for garbage collection
+// Close shuts down the object
 func (r *Yaesu) Close() {
 	r.Lock()
 	defer r.Unlock()
@@ -132,7 +131,7 @@ func (r *Yaesu) checkWatchdog() bool {
 	return false
 }
 
-// Start starts the main event loop for the serial port.
+// Start the main event loop for the serial port.
 // It will query the Yaesu rotator for the current heading (azimuth + elevation)
 // with the pollingrate defined during initialization.
 // A watchdog detects if the Yaesu rotator does not respond anymore.
@@ -170,7 +169,8 @@ func (r *Yaesu) start() {
 
 		msg, err := r.read()
 		if err != nil {
-			// Timeout... continue
+			// serialport read is expected to timeout after 100ms
+			// to unblock this routine
 			if err == io.EOF {
 				continue
 			}
