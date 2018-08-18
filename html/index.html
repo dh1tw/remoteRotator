@@ -22,7 +22,7 @@
       <div id="azimuth-rotator">
         <rotator-name :name="selectedAzRotator.name" :is-azimuth="true" :width="canvasSize"></rotator-name>
         <azimuth-rotator v-on:set-azimuth="setAzimuth" :name="selectedAzRotator.name" :heading="selectedAzRotator.heading.azimuth" :preset="selectedAzRotator.heading.az_preset"
-          :overlap="selectedAzRotator.config.az_overlap" :min="selectedAzRotator.config.az_min" :max="selectedAzRotator.config.az_max" :stop="selectedAzRotator.config.az_stop"
+          :overlap="selectedAzRotator.config.azimuth_overlap" :min="selectedAzRotator.config.azimuth_min" :max="selectedAzRotator.config.azimuth_max" :stop="selectedAzRotator.config.azimuth_stop"
           :canvas-size="canvasSize">
         </azimuth-rotator>
         <div class="mini-rotators" v-if="Object.keys(sortedAzRotators).length > 1">
@@ -45,7 +45,7 @@
       <div id="elevation-rotator">
         <rotator-name :name="selectedElRotator.name" :width="canvasSize"></rotator-name>
         <elevation-rotator v-on:set-elevation="setElevation" :name="selectedElRotator.name" :heading="selectedElRotator.heading.elevation"
-          :preset="selectedElRotator.heading.el_preset" :min="selectedElRotator.config.el_min" :max="selectedElRotator.config.el_max" :canvas-size="canvasSize">
+          :preset="selectedElRotator.heading.el_preset" :min="selectedElRotator.config.elevation_min" :max="selectedElRotator.config.elevation_max" :canvas-size="canvasSize">
         </elevation-rotator>
         <div class="mini-rotators" v-if="Object.keys(sortedElRotators).length > 1">
           <ul>
@@ -55,7 +55,7 @@
                   v-on:click="setElRotator(rotator.name) ">{{rotator.name}}</button>
                 <div class='mini-rotator-canvas'>
                   <elevation-rotator :name="rotator.name" :heading="rotator.heading.elevation" :preset="rotator.heading.el_preset" v-on:set-elevation="setElevation"
-                    :min="rotator.config.el_min" :max="rotator.config.el_max" :canvas-size=100></elevation-rotator>
+                    :min="rotator.config.elevation_min" :max="rotator.config.elevation_max" :canvas-size=100></elevation-rotator>
                 </div>
               </div>
             </li>
