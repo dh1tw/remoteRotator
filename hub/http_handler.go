@@ -190,7 +190,7 @@ func (hub *Hub) elevationHandler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		err := r.SetAzimuth(*elPUT.Elevation)
+		err := r.SetElevation(*elPUT.Elevation)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(fmt.Sprintf("unable to set elevation to %v: %s", *elPUT.Elevation, err)))
