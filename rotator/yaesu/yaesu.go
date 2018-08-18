@@ -248,7 +248,7 @@ func (r *Yaesu) parseMsg(msg string) {
 
 		if r.eventHandler != nil && gotNewValue {
 			// cb launched async to avoid deadlock on yaesu.*()
-			go r.eventHandler(r, r.Serialize().Heading)
+			go r.eventHandler(r, r.serialize().Heading)
 		}
 	}
 }
@@ -410,6 +410,11 @@ func (r *Yaesu) StopElevation() error {
 func (r *Yaesu) Serialize() rotator.Object {
 	r.RLock()
 	defer r.RUnlock()
+
+	return r.serialize()
+}
+
+func (r *Yaesu) serialize() rotator.Object {
 
 	obj := rotator.Object{
 		Name: r.name,
