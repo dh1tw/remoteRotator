@@ -71,6 +71,7 @@ func New(opts ...func(*Yaesu)) (*Yaesu, error) {
 		headingPattern:  headingPattern,
 		azimuthMax:      450,
 		elevationMax:    180,
+		closeCh:         make(chan struct{}),
 	}
 
 	for _, opt := range opts {
@@ -149,7 +150,6 @@ func (r *Yaesu) start() {
 	for {
 		select {
 		case <-r.pollingTicker.C:
-			// fmt.Println("tick")
 			if err := r.query(); err != nil {
 				fmt.Println("serial port write error:", err)
 				close(r.errorCh)
@@ -160,6 +160,8 @@ func (r *Yaesu) start() {
 				close(r.errorCh)
 				return
 			}
+		// when closing has been signaled, stop polling and
+		// reading from the serial port by exiting this function
 		case <-r.closeCh:
 			return
 		default:
