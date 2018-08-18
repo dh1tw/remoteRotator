@@ -3,6 +3,7 @@ package yaesu
 import (
 	"bytes"
 	"regexp"
+	"runtime"
 	"testing"
 
 	"github.com/dh1tw/remoteRotator/rotator"
@@ -391,21 +392,26 @@ func TestNewYaesuPortNotExist(t *testing.T) {
 
 	tt := []struct {
 		name     string
+		os       string
 		portName func(*Yaesu)
 		expError string
-		altError string
 	}{
-		{"port does not exist", Portname("/dev/ttyXXXXX"), "open /dev/ttyXXXXX: no such file or directory", ""},
-		{"invalid serial port", Portname("/dev/null"), "File is not a tty", "inappropriate ioctl for device"},
+		{"port does not exist", "linux", Portname("/dev/ttyXXXXX"), "open /dev/ttyXXXXX: no such file or directory"},
+		{"port does not exist", "darwin", Portname("/dev/ttyXXXXX"), "open /dev/ttyXXXXX: no such file or directory"},
+		{"port does not exist", "windows", Portname("/dev/ttyXXXXX"), "The system cannot find the path specified."},
+		{"invalid serial port", "linux", Portname("/dev/null"), "inappropriate ioctl for device"},
+		{"invalid serial port", "darwin", Portname("/dev/null"), "File is not a tty"},
+		{"invalid serial port", "windows", Portname("/dev/null"), "The system cannot find the path specified."},
 	}
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
+			if runtime.GOOS != tc.os {
+				t.Skip()
+			}
 			_, err := New(tc.portName)
 			if err.Error() != tc.expError {
-				if err.Error() != tc.altError {
-					t.Fatalf("expected error '%s', got '%s'", tc.expError, err.Error())
-				}
+				t.Fatalf("expected error '%s', got '%s'", tc.expError, err.Error())
 			}
 		})
 	}
