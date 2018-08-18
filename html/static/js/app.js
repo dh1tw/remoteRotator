@@ -116,7 +116,7 @@ var vm = new Vue({
 
                 // check if other elevation rotators are still available
                 if (Object.keys(this.elRotators).length > 0) {
-                    if (this.selectedElRotator.name == rotator.name) {
+                    if (this.selectedElRotator.name == rotatorName) {
                         // pick the first one in the list
                         var nextRot = Object.keys(this.elRotators)[0];
                         this.selectedElRotator = this.elRotators[nextRot];
