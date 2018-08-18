@@ -22,6 +22,8 @@ type Hub struct {
 	wsClients      map[*WsClient]bool
 	closeWsClient  chan *WsClient
 	rotators       map[string]rotator.Rotator //key: Rotator name
+	router         *mux.Router
+	fileServer     http.Handler
 }
 
 // NewHub returns the pointer to an initialized Hub object.
@@ -230,23 +232,16 @@ func (hub *Hub) ListenHTTP(host string, port int, errorCh chan<- struct{}) {
 	defer close(errorCh)
 
 	box := rice.MustFindBox("../html")
-	fileServer := http.FileServer(box.HTTPBox())
+	hub.fileServer = http.FileServer(box.HTTPBox())
+	hub.router = mux.NewRouter().StrictSlash(true)
 
-	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/api/rotators", hub.rotatorsHandler).Methods("GET")
-	router.HandleFunc("/api/rotator/{rotator}", hub.rotatorHandler).Methods("GET")
-	router.HandleFunc("/api/rotator/{rotator}/azimuth", hub.azimuthHandler)
-	router.HandleFunc("/api/rotator/{rotator}/elevation", hub.elevationHandler)
-	router.HandleFunc("/api/rotator/{rotator}/stop", hub.stopHandler)
-	router.HandleFunc("/api/rotator/{rotator}/stop_azimuth", hub.stopAzimuthHandler)
-	router.HandleFunc("/api/rotator/{rotator}/stop_elevation", hub.stopElevationHandler)
-	router.HandleFunc("/ws", hub.wsHandler)
-	router.PathPrefix("/").Handler(fileServer)
+	// load the HTTP routes with their respective endpoints
+	hub.routes()
 
 	// Listen for incoming connections.
 	log.Printf("listening on %s:%d for HTTP connections\n", host, port)
 
-	err := http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), router)
+	err := http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), hub.router)
 	if err != nil {
 		log.Println(err)
 		return
