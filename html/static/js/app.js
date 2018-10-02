@@ -143,7 +143,11 @@ var vm = new Vue({
         // open the websocket and set an eventlister to receive updates
         // for rotators
         openWebsocket: function () {
-            this.ws = new ReconnectingWebSocket('ws://' + window.location.host + '/ws');
+            var protocol = "ws://";
+            if (window.location.protocol.indexOf("https") !== -1) {
+                protocol = "wss://";
+            }
+            this.ws = new ReconnectingWebSocket(protocol + window.location.host + '/ws');
             this.ws.addEventListener('message', function (e) {
                 var eventMsg = JSON.parse(e.data);
                 // console.log(eventMsg);
