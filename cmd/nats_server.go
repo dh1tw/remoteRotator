@@ -11,13 +11,13 @@ import (
 	"github.com/dh1tw/remoteRotator/rotator"
 	sbRotator "github.com/dh1tw/remoteRotator/sb_rotator"
 	"github.com/gogo/protobuf/proto"
-	"github.com/micro/go-micro"
+	micro "github.com/micro/go-micro"
 	"github.com/micro/go-micro/broker"
 	"github.com/micro/go-micro/server"
 	natsBroker "github.com/micro/go-plugins/broker/nats"
 	natsReg "github.com/micro/go-plugins/registry/nats"
 	natsTr "github.com/micro/go-plugins/transport/nats"
-	"github.com/nats-io/go-nats"
+	nats "github.com/nats-io/go-nats"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	// _ "net/http/pprof"
@@ -80,7 +80,7 @@ func natsServer(cmd *cobra.Command, args []string) {
 		} else {
 			fmt.Println("Error parsing config file", viper.ConfigFileUsed())
 			fmt.Println(err)
-			os.Exit(-1)
+			os.Exit(1)
 		}
 	}
 
@@ -185,6 +185,21 @@ func natsServer(cmd *cobra.Command, args []string) {
 
 	// initalize our service
 	rs.Init()
+
+	// before we annouce this service, we have to ensure that no other
+	// service with the same name exists. Therefore we query the
+	// registry for all other existing services.
+	services, err := reg.ListServices()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// if a service with this name already exists, then exit
+	for _, service := range services {
+		if service.Name == serviceName {
+			log.Fatalf("service '%s' already exists", service.Name)
+		}
+	}
 
 	rpcRot.rotator = r
 	rpcRot.service = rs
