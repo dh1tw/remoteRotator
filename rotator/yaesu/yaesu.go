@@ -46,7 +46,7 @@ type Yaesu struct {
 	watchdogTs      time.Time
 }
 
-// New creates a new Yaesu object which satisfies implicitely the
+// New creates a new Yaesu object which satisfies implicitly the
 // rotator.Rotator interface. Configuration settings can be set through
 // functional options.
 // Default settings are:

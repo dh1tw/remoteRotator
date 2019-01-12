@@ -36,7 +36,7 @@ type SbProxy struct {
 	serviceName    string //better call it address (?)
 }
 
-// New returns the pointer to an initalized Rotator proxy object.
+// New returns the pointer to an initialized Rotator proxy object.
 func New(opts ...func(*SbProxy)) (*SbProxy, error) {
 
 	r := &SbProxy{
