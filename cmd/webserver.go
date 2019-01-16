@@ -17,7 +17,7 @@ import (
 	natsReg "github.com/micro/go-plugins/registry/nats"
 	"github.com/micro/go-plugins/selector/named"
 	natsTr "github.com/micro/go-plugins/transport/nats"
-	"github.com/nats-io/go-nats"
+	nats "github.com/nats-io/go-nats"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -25,7 +25,7 @@ import (
 	"github.com/dh1tw/remoteRotator/hub"
 	"github.com/dh1tw/remoteRotator/rotator"
 	"github.com/dh1tw/remoteRotator/rotator/proxy"
-	"github.com/dh1tw/remoteRotator/rotator/sb_proxy"
+	sbProxy "github.com/dh1tw/remoteRotator/rotator/sb_proxy"
 )
 
 var webServerCmd = &cobra.Command{
@@ -52,6 +52,19 @@ func init() {
 // }
 
 func webServer(cmd *cobra.Command, args []string) {
+
+	// Try to read config file
+	if err := viper.ReadInConfig(); err == nil {
+		fmt.Println("Using config file:", viper.ConfigFileUsed())
+	} else {
+		if strings.Contains(err.Error(), "Not Found in") {
+			fmt.Println("no config file found")
+		} else {
+			fmt.Println("Error parsing config file", viper.ConfigFileUsed())
+			fmt.Println(err)
+			os.Exit(1)
+		}
+	}
 
 	viper.BindPFlag("web.host", cmd.Flags().Lookup("host"))
 	viper.BindPFlag("web.port", cmd.Flags().Lookup("port"))
