@@ -54,6 +54,56 @@ func (c *TCPClient) listen(rotator rotator.Rotator, closer chan<- *TCPClient) {
 				continue
 			}
 			rotator.SetAzimuth(az)
+
+		case "N":
+			msg = strings.TrimRight(msg[1:], "\r\n")
+
+			if len(msg) == 0 {
+				if err := c.prompt(); err != nil {
+					log.Println(err)
+					return
+				}
+				continue
+			}
+			// Elevation readout
+			el, err := strconv.Atoi(msg)
+			if err != nil {
+				log.Printf("parse error (%v): %v; msg: %s\n", c.Conn.RemoteAddr(), err, msg)
+				continue
+			}
+			rotator.SetElevation(el)
+
+		case "W":
+			msg = strings.TrimRight(msg[1:], "\r\n")
+
+			if len(msg) == 0 {
+				if err := c.prompt(); err != nil {
+					log.Println(err)
+					return
+				}
+				continue
+			}
+			if len(msg) != 7 {
+				log.Printf("Invalid command received.\n")
+				continue
+			}
+
+			CmdArray := strings.Fields(msg)
+
+			az, err := strconv.Atoi(CmdArray[0])
+			if err != nil {
+				log.Printf("parse error (%v): %v; msg: %s\n", c.Conn.RemoteAddr(), err, msg)
+				continue
+			}
+			rotator.SetAzimuth(az)
+
+			el, err := strconv.Atoi(CmdArray[1])
+			if err != nil {
+				log.Printf("parse error (%v): %v; msg: %s\n", c.Conn.RemoteAddr(), err, msg)
+				continue
+			}
+			rotator.SetElevation(el)
+
 		// query
 		case "C":
 			// azimuth + elevation
