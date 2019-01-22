@@ -1,5 +1,5 @@
 language: go
-dist: trusty
+dist: xenial
 sudo: true
 
 matrix:
@@ -9,43 +9,43 @@ matrix:
     - GIMME_OS=linux
       GIMME_ARCH=amd64
       HOST_OS=linux
-    go: 1.9
+    go: "1.11"
   - os: linux
     env:
     - GIMME_OS=linux
     - GIMME_ARCH=386
     - HOST_OS=linux
-    go: 1.9
+    go: "1.11"
   - os: linux
     env:
     - GIMME_OS=linux
     - GIMME_ARCH=arm
     - HOST_OS=linux
-    go: 1.9  
+    go: "1.11"
   # - os: linux  #temporarily removed since hashicorp/go.net doesn't compile
   #   env:
   #   - GIMME_OS=linux
   #   - GIMME_ARCH=arm64
   #   - HOST_OS=linux
-  #   go: 1.9  
+  #   go: 1.9
   - os: linux
     env:
     - GIMME_OS=windows
     - GIMME_ARCH=amd64
     - HOST_OS=linux
-    go: 1.9  
+    go: "1.11"
   - os: linux
     env:
     - GIMME_OS=windows
     - GIMME_ARCH=386
     - HOST_OS=linux
-    go: 1.9  
+    go: "1.10"
   - os: osx
     env:
     - GIMME_OS=darwin
     - GIMME_ARCH=amd64
     - HOST_OS=darwin
-    go: 1.9
+    go: "1.11"
 
 before_install:
 - git fetch --tags
