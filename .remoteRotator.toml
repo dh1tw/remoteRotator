@@ -1,3 +1,9 @@
+[nats]
+broker-url = "127.0.0.1"
+broker-port = 4222
+username = ""
+password = ""
+
 [tcp]
 enabled = true
 host = "127.0.0.1"

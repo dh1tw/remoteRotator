@@ -71,4 +71,4 @@ deploy:
     repo: dh1tw/remoteRotator
     tags: true
     draft: true
-    go: 1.9
+    go: "1.10"

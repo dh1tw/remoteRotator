@@ -12,7 +12,7 @@ import (
 // for testing purposes
 type Dummy struct {
 	sync.RWMutex
-	eventHandler   func(rotator.Rotator, rotator.Event, ...interface{})
+	eventHandler   func(rotator.Rotator, rotator.Heading)
 	name           string
 	azimuthMin     int
 	azimuthMax     int
@@ -33,84 +33,6 @@ type Dummy struct {
 	closeCh        chan struct{}
 	starter        sync.Once
 	closer         sync.Once
-}
-
-// Name is a functional option to set the name of the rotator
-func Name(name string) func(*Dummy) {
-	return func(r *Dummy) {
-		r.name = name
-	}
-}
-
-// HasAzimuth is a functional option to enable Azimuth
-func HasAzimuth(set bool) func(*Dummy) {
-	return func(r *Dummy) {
-		r.hasAzimuth = set
-	}
-}
-
-// HasElevation is a functional option to enable Elevation
-func HasElevation(set bool) func(*Dummy) {
-	return func(r *Dummy) {
-		r.hasElevation = set
-	}
-}
-
-// AzimuthMin is a functional option to set the minimum azimuth angle.
-func AzimuthMin(min int) func(*Dummy) {
-	return func(r *Dummy) {
-		r.azimuthMin = min
-	}
-}
-
-// AzimuthMax is a functional option to set the maximum azimuth angle.
-func AzimuthMax(max int) func(*Dummy) {
-	return func(r *Dummy) {
-		r.azimuthMax = max
-	}
-}
-
-// AzimuthStop is a functional option to set the mechanical stop of the rotator.
-func AzimuthStop(stop int) func(*Dummy) {
-	return func(r *Dummy) {
-		r.azimuthStop = stop
-	}
-}
-
-// AzimuthSpeed sets the simulated speed of the rotator in degrees / second
-func AzimuthSpeed(speed int) func(*Dummy) {
-	return func(r *Dummy) {
-		r.azSpeed = float32(speed)
-	}
-}
-
-// ElevationMin is a functional option to set the minimum elevation angle.
-func ElevationMin(min int) func(*Dummy) {
-	return func(r *Dummy) {
-		r.elevationMin = min
-	}
-}
-
-// ElevationMax is a functional option to set the maximum elevation angle.
-func ElevationMax(max int) func(*Dummy) {
-	return func(r *Dummy) {
-		r.elevationMax = max
-	}
-}
-
-// ElevationSpeed sets the simulated speed of the rotator in degrees / second
-func ElevationSpeed(speed int) func(*Dummy) {
-	return func(r *Dummy) {
-		r.elSpeed = float32(speed)
-	}
-}
-
-// EventHandler sets a callback function through which the rotator
-// will report Event
-func EventHandler(h func(rotator.Rotator, rotator.Event, ...interface{})) func(*Dummy) {
-	return func(r *Dummy) {
-		r.eventHandler = h
-	}
 }
 
 // New creates a new dummy rotator which satisfies the
@@ -325,7 +247,7 @@ func (r *Dummy) StopAzimuth() error {
 
 	r.azPreset = r.azimuth
 	if r.eventHandler != nil {
-		r.eventHandler(r, rotator.Azimuth, r.status())
+		r.eventHandler(r, r.serialize().Heading)
 	}
 
 	return nil
@@ -338,7 +260,7 @@ func (r *Dummy) StopElevation() error {
 
 	r.elPreset = r.elevation
 	if r.eventHandler != nil {
-		r.eventHandler(r, rotator.Elevation, r.status())
+		r.eventHandler(r, r.serialize().Heading)
 	}
 	return nil
 }
@@ -351,88 +273,41 @@ func (r *Dummy) Stop() error {
 	r.elPreset = r.elevation
 	r.azPreset = r.azimuth
 	if r.eventHandler != nil {
-		status := r.status()
-		r.eventHandler(r, rotator.Azimuth, status)
-		r.eventHandler(r, rotator.Elevation, status)
+		r.eventHandler(r, r.serialize().Heading)
 	}
 
 	return nil
 }
 
-func (r *Dummy) status() rotator.Status {
-	return rotator.Status{
-		Name:           r.name,
-		Azimuth:        int(r.azimuth),
-		AzPreset:       int(r.azPreset),
-		AzimuthOverlap: r.azimuthOverlap,
-		Elevation:      int(r.elevation),
-		ElPreset:       int(r.elPreset),
-	}
-}
-
-// Status returns a a rotator.Status struct with the information
-// of this rotator.
-func (r *Dummy) Status() rotator.Status {
+// Serialize the data of the rotator
+func (r *Dummy) Serialize() rotator.Object {
 	r.RLock()
 	defer r.RUnlock()
-	return r.status()
+	return r.serialize()
 }
 
-// ExecuteRequest takes a request struct and sets the new values
-func (r *Dummy) ExecuteRequest(req rotator.Request) error {
-	if req.HasAzimuth {
-		if err := r.SetAzimuth(req.Azimuth); err != nil {
-			return err
-		}
+func (r *Dummy) serialize() rotator.Object {
+
+	obj := rotator.Object{
+		Name: r.name,
+		Heading: rotator.Heading{
+			Azimuth:   int(r.azimuth),
+			AzPreset:  int(r.azPreset),
+			Elevation: int(r.elevation),
+			ElPreset:  int(r.elPreset),
+		},
+		Config: rotator.Config{
+			HasAzimuth:   r.hasAzimuth,
+			HasElevation: r.hasElevation,
+			AzimuthMax:   r.azimuthMax,
+			AzimuthMin:   r.azimuthMin,
+			AzimuthStop:  r.azimuthStop,
+			ElevationMax: r.elevationMax,
+			ElevationMin: r.elevationMin,
+		},
 	}
 
-	if req.HasElevation {
-		if err := r.SetElevation(req.Elevation); err != nil {
-			return err
-		}
-	}
-
-	if req.StopAzimuth {
-		if err := r.StopAzimuth(); err != nil {
-			return err
-		}
-	}
-
-	if req.StopElevation {
-		if err := r.StopElevation(); err != nil {
-			return err
-		}
-	}
-
-	if req.Stop {
-		if err := r.Stop(); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// Info returns a rotator.Info struct with the current values of the rotator
-func (r *Dummy) Info() rotator.Info {
-	r.RLock()
-	defer r.RUnlock()
-
-	return rotator.Info{
-		Name:           r.name,
-		HasAzimuth:     r.hasAzimuth,
-		HasElevation:   r.hasElevation,
-		AzimuthMin:     r.azimuthMin,
-		AzimuthMax:     r.azimuthMax,
-		AzimuthStop:    r.azimuthStop,
-		AzimuthOverlap: r.azimuthOverlap,
-		ElevationMin:   r.elevationMin,
-		ElevationMax:   r.elevationMax,
-		Azimuth:        int(r.azimuth),
-		AzPreset:       int(r.azPreset),
-		Elevation:      int(r.elevation),
-		ElPreset:       int(r.elPreset),
-	}
+	return obj
 }
 
 func (r *Dummy) updateHeadings() {
@@ -447,7 +322,7 @@ func (r *Dummy) updateAzimuth() {
 	if r.hasAzimuth {
 		changed := r.calcNewAzHeading()
 		if changed {
-			r.eventHandler(r, rotator.Azimuth, r.status())
+			r.eventHandler(r, r.serialize().Heading)
 		}
 	}
 }
@@ -457,7 +332,7 @@ func (r *Dummy) updateElevation() {
 	if r.hasElevation {
 		changed := r.calcNewElHeading()
 		if changed {
-			r.eventHandler(r, rotator.Elevation, r.status())
+			r.eventHandler(r, r.serialize().Heading)
 		}
 	}
 }

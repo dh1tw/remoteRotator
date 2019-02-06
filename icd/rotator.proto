@@ -1,0 +1,46 @@
+syntax ="proto3";
+
+package shackbus;
+
+service Rotator{
+    rpc SetAzimuth(HeadingReq) returns (None);
+    rpc SetElevation(HeadingReq) returns (None);
+    rpc StopAzimuth(None) returns (None);
+    rpc StopElevation(None) returns (None);
+    rpc GetMetadata(None) returns (Metadata);
+    rpc GetState(None) returns (State);
+}
+
+message None{}
+
+message Error{
+    string error = 1;
+    int32 code = 2;
+    string description = 3;
+}
+
+message HeadingReq{
+    int32 heading = 1;
+}
+
+message HeadingResp{
+    int32 heading = 1;
+    int32 preset = 2;
+}
+
+message State{
+    int32 azimuth = 1;
+    int32 azimuth_preset = 2;
+    int32 elevation = 3;
+    int32 elevation_preset = 4;
+}
+
+message Metadata{
+    int32 azimuth_stop = 1;
+    int32 azimuth_min = 2;
+    int32 azimuth_max = 3;
+    int32 elevation_min = 4;
+    int32 elevation_max = 5;
+    bool has_azimuth = 6;
+    bool has_elevation = 7;
+}

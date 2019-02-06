@@ -10,14 +10,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dh1tw/remoteRotator/hub"
+	"github.com/dh1tw/remoteRotator/rotator"
 	"github.com/micro/mdns"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
-	"github.com/dh1tw/remoteRotator/hub"
-	"github.com/dh1tw/remoteRotator/rotator"
-	"github.com/dh1tw/remoteRotator/rotator/dummy"
-	"github.com/dh1tw/remoteRotator/rotator/yaesu"
 	// _ "net/http/pprof"
 )
 
@@ -25,15 +22,15 @@ var lanServerCmd = &cobra.Command{
 	Use:   "lan",
 	Short: "expose a rotator on your local network",
 	Long: `
-The local lan server allows you to expose a rotator to a local area network. 
-By default, the rotator will only be listening on the loopback adapter. In 
-order to make it available and discoverable on the local network, a network 
-connected adapter has to be selected. 
+The local lan server allows you to expose a rotator to a local area network.
+By default, the rotator will only be listening on the loopback adapter. In
+order to make it available and discoverable on the local network, a network
+connected adapter has to be selected.
 
 remoteRotator supports access via TCP, emulating the Yaesu GS232 protocol
 (disabled by default) and through a web interface (HTTP + Websocket).
 
-You can select the following rotator types: 
+You can select the following rotator types:
 1. Yaesu (GS232 compatible)
 2. Dummy (great for testing)
 
@@ -43,8 +40,8 @@ remoteRotator allows to assign a series of meta data to a rotator:
 3. Azimuth/Elevation maximum value
 4. Azimuth Mechanical stop
 
-These metadata enhance the rotators view (e.g. showing overlap) in the web 
-interface and can also help to limit for example the rotators range if it does 
+These metadata enhance the rotators view (e.g. showing overlap) in the web
+interface and can also help to limit for example the rotators range if it does
 not support full 360°.
 
 `,
@@ -111,127 +108,33 @@ func lanServer(cmd *cobra.Command, args []string) {
 	viper.BindPFlag("rotator.elevation-min", cmd.Flags().Lookup("elevation-min"))
 	viper.BindPFlag("rotator.elevation-max", cmd.Flags().Lookup("elevation-max"))
 
-	if len(viper.GetString("rotator.name")) == 0 {
-		log.Println("rotator name must not be empty")
+	if err := sanityCheckRotatorInputs(); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	if viper.GetBool("rotator.has-azimuth") {
-
-		if viper.GetInt("rotator.azimuth-min") >= viper.GetInt("rotator.azimuth-max") {
-			log.Println("azimuth-min must be smaller than azimuth-max")
-			os.Exit(1)
-		}
-
-		if viper.GetInt("rotator.azimuth-max") > 360 && viper.GetInt("rotator.azimuth-min") > 360 {
-			log.Println("if azimuth-max is >360, azimuth-min must be < 360")
-			os.Exit(1)
-		}
-
-		if viper.GetInt("rotator.azimuth-min") < 0 {
-			log.Println("azimuth-min must be >= 0")
-			os.Exit(1)
-		}
-
-		if viper.GetInt("rotator.azimuth-max") > 500 {
-			log.Println("azimuth-min must be <= 500")
-			os.Exit(1)
-		}
-	}
-
-	if viper.GetBool("rotator.has-elevation") {
-
-		if viper.GetInt("rotator.elevation-min") < 0 {
-			log.Println("elevation-min must be >= 0")
-			os.Exit(1)
-		}
-
-		if viper.GetInt("rotator.elevation-max") > 180 {
-			log.Println("elevation-min must be <= 180")
-			os.Exit(1)
-		}
-	}
-
-	if viper.GetBool("discovery.enabled") && !viper.GetBool("http.enabled") {
-		log.Println("for discovery, HTTP must be enabled")
+	if err := sanityCheckDiscovery(); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 
+	// Profiling (uncomment if needed)
 	// go func() {
 	// 	log.Println(http.ListenAndServe("0.0.0.0:6060", http.DefaultServeMux))
 	// }()
 
-	bcast := make(chan rotator.Status, 10)
+	bcast := make(chan rotator.Heading, 10)
 
-	var yaesuEventHandler = func(r rotator.Rotator, ev rotator.Event, value ...interface{}) {
-		// fmt.Println(ev, value)
-		switch ev {
-		case rotator.Azimuth, rotator.Elevation:
-			if len(value) == 0 {
-				return
-			}
-			switch value[0].(type) {
-			case rotator.Status:
-				bcast <- value[0].(rotator.Status)
-			}
-		default:
-			log.Printf("unknown event: %v with value(s): %v\n", ev, value)
-		}
+	var rEventHandler = func(r rotator.Rotator, heading rotator.Heading) {
+		bcast <- heading
 	}
-
-	h := &hub.Hub{}
 
 	rotatorError := make(chan struct{})
 
-	var r rotator.Rotator
-
-	switch strings.ToUpper(viper.GetString("rotator.type")) {
-
-	case "YAESU":
-		evHandler := yaesu.EventHandler(yaesuEventHandler)
-		name := yaesu.Name(viper.GetString("rotator.name"))
-		interval := yaesu.UpdateInterval(viper.GetDuration("rotator.pollingrate"))
-		spPortName := yaesu.Portname(viper.GetString("rotator.portname"))
-		baudrate := yaesu.Baudrate(viper.GetInt("rotator.baudrate"))
-		hasAzimuth := yaesu.HasAzimuth(viper.GetBool("rotator.has-azimuth"))
-		hasElevation := yaesu.HasElevation(viper.GetBool("rotator.has-elevation"))
-		azMin := yaesu.AzimuthMin(viper.GetInt("rotator.azimuth-min"))
-		azMax := yaesu.AzimuthMax(viper.GetInt("rotator.azimuth-max"))
-		elMin := yaesu.ElevationMin(viper.GetInt("rotator.elevation-min"))
-		elMax := yaesu.ElevationMax(viper.GetInt("rotator.elevation-max"))
-		azStop := yaesu.AzimuthStop(viper.GetInt("rotator.azimuth-stop"))
-		errorCh := yaesu.ErrorCh(rotatorError)
-
-		yaesu, err := yaesu.New(name, interval, evHandler,
-			spPortName, baudrate, hasAzimuth, hasElevation, azMin, azMax, elMin,
-			elMax, azStop, errorCh)
-		if err != nil {
-			fmt.Println("unable to initialize YAESU rotator:", err)
-			os.Exit(1)
-		}
-		r = yaesu
-
-	case "DUMMY":
-		evHandler := dummy.EventHandler(yaesuEventHandler)
-		name := dummy.Name(viper.GetString("rotator.name"))
-		hasAzimuth := dummy.HasAzimuth(viper.GetBool("rotator.has-azimuth"))
-		hasElevation := dummy.HasElevation(viper.GetBool("rotator.has-elevation"))
-		azMin := dummy.AzimuthMin(viper.GetInt("rotator.azimuth-min"))
-		azMax := dummy.AzimuthMax(viper.GetInt("rotator.azimuth-max"))
-		elMin := dummy.ElevationMin(viper.GetInt("rotator.elevation-min"))
-		elMax := dummy.ElevationMax(viper.GetInt("rotator.elevation-max"))
-		azStop := dummy.AzimuthStop(viper.GetInt("rotator.azimuth-stop"))
-
-		dummyRotator, err := dummy.New(name, evHandler, hasAzimuth, hasElevation, azMin, azMax, azStop, elMin, elMax)
-		if err != nil {
-			fmt.Println("unable to initialize Dummy rotator:", err)
-			os.Exit(1)
-		}
-
-		r = dummyRotator
-
-	default:
-		log.Printf("unknown rotator type (%v)\n", viper.GetString("rotator.type"))
+	// initialize our Rotator
+	r, err := initRotator(viper.GetString("rotator.type"), rEventHandler, rotatorError)
+	if err != nil {
+		fmt.Println("unable to initialize rotator:", err)
 		os.Exit(1)
 	}
 
@@ -248,11 +151,11 @@ func lanServer(cmd *cobra.Command, args []string) {
 		go h.ListenTCP(viper.GetString("tcp.host"), viper.GetInt("tcp.port"), tcpError)
 	}
 
-	wsError := make(chan bool)
+	webServerError := make(chan struct{})
 
 	// start HTTP server
 	if viper.GetBool("http.enabled") {
-		go h.ListenHTTP(viper.GetString("http.host"), viper.GetInt("http.port"), wsError)
+		go h.ListenHTTP(viper.GetString("http.host"), viper.GetInt("http.port"), webServerError)
 	}
 
 	// start mDNS server
@@ -284,7 +187,7 @@ func lanServer(cmd *cobra.Command, args []string) {
 			return
 		case <-tcpError:
 			return
-		case <-wsError:
+		case <-webServerError:
 			return
 		}
 	}

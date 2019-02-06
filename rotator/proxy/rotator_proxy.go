@@ -1,6 +1,8 @@
 package proxy
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -33,10 +35,9 @@ type Proxy struct {
 	host           string
 	port           int
 	conn           *websocket.Conn
-	wsWriteMutex   sync.Mutex
 	wsTxTimeout    time.Duration
 	wsRxTimeout    time.Duration
-	eventHandler   func(rotator.Rotator, rotator.Event, ...interface{})
+	eventHandler   func(rotator.Rotator, rotator.Heading)
 	name           string
 	azimuthMin     int
 	azimuthMax     int
@@ -54,36 +55,6 @@ type Proxy struct {
 	doneCh         chan struct{}
 }
 
-// Host is a functional option to set IP / dns name of the remote Rotators host.
-func Host(host string) func(*Proxy) {
-	return func(r *Proxy) {
-		r.host = host
-	}
-}
-
-// Port is a functional option to set port of the remote Rotators on its host.
-func Port(port int) func(*Proxy) {
-	return func(r *Proxy) {
-		r.port = port
-	}
-}
-
-// DoneCh is a functional option allows you to pass a channel to the proxy object.
-// The channel will be closed and thus notifies you when the object has been deleted.
-func DoneCh(ch chan struct{}) func(*Proxy) {
-	return func(r *Proxy) {
-		r.doneCh = ch
-	}
-}
-
-// EventHandler sets a callback function through which the proxy rotator
-// will report Events
-func EventHandler(h func(rotator.Rotator, rotator.Event, ...interface{})) func(*Proxy) {
-	return func(r *Proxy) {
-		r.eventHandler = h
-	}
-}
-
 // New returns the pointer to an initalized Rotator proxy object.
 func New(opts ...func(*Proxy)) (*Proxy, error) {
 
@@ -96,7 +67,7 @@ func New(opts ...func(*Proxy)) (*Proxy, error) {
 		opt(r)
 	}
 
-	if err := r.getInfo(); err != nil {
+	if err := r.getObject(); err != nil {
 		return nil, err
 	}
 
@@ -109,6 +80,8 @@ func New(opts ...func(*Proxy)) (*Proxy, error) {
 	}
 
 	conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	// Pong handler extends the read deadline by wsPongWait whenever a
+	// pong has been received
 	conn.SetPongHandler(func(string) error {
 		conn.SetReadDeadline(time.Now().Add(wsPongWait))
 		return nil
@@ -116,23 +89,24 @@ func New(opts ...func(*Proxy)) (*Proxy, error) {
 
 	r.conn = conn
 
+	// this function sends every wsPingPeriod a ping to the other side.
+	// if this fails, the function terminates. No further signaling needed,
+	// since the readTimeout will kick in eventually and start the object
+	// disposal.
 	go func() {
 		ping := time.NewTicker(wsPingPeriod)
 		for {
-			select {
-			case <-ping.C:
-				r.wsWriteMutex.Lock()
-				r.conn.SetWriteDeadline(time.Now().Add(wsWriteWait))
-				if err := r.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
-					// log.Println(err)
-					r.wsWriteMutex.Unlock()
-					return
-				}
-				r.wsWriteMutex.Unlock()
+			<-ping.C
+			r.conn.SetWriteDeadline(time.Now().Add(wsWriteWait))
+			if err := r.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+				return
 			}
 		}
 	}()
 
+	// this function listen on the websocket for incoming messages or until
+	// readTimeout kicks in. This shouldn't happen as long as the counterpart
+	// responds to the pings.
 	go func() {
 		for {
 			_, msg, err := conn.ReadMessage()
@@ -142,6 +116,8 @@ func New(opts ...func(*Proxy)) (*Proxy, error) {
 					websocket.CloseNormalClosure) {
 					log.Println("websocket error:", err)
 				}
+				// Signal the object holder that we are going to shutdown so
+				// that this object can be disposed.
 				close(r.doneCh)
 				return
 			}
@@ -158,29 +134,29 @@ func New(opts ...func(*Proxy)) (*Proxy, error) {
 				// pass
 			case "heading":
 				r.Lock()
-				s := data.Status
+				changed := false
+
+				s := data.Heading
 				if r.azimuth != s.Azimuth {
 					r.azimuth = s.Azimuth
-					if r.eventHandler != nil {
-						go r.eventHandler(r, rotator.Azimuth, s)
-					}
+					changed = true
 				}
 				if r.azPreset != s.AzPreset {
 					r.azPreset = s.AzPreset
-					if r.eventHandler != nil {
-						go r.eventHandler(r, rotator.Azimuth, s)
-					}
+					changed = true
 				}
 				if r.elevation != s.Elevation {
 					r.elevation = s.Elevation
-					if r.eventHandler != nil {
-						go r.eventHandler(r, rotator.Elevation, s)
-					}
+					changed = true
 				}
 				if r.elPreset != s.ElPreset {
 					r.elPreset = s.ElPreset
+					changed = true
+				}
+
+				if changed {
 					if r.eventHandler != nil {
-						go r.eventHandler(r, rotator.Elevation, s)
+						go r.eventHandler(r, s)
 					}
 				}
 				r.Unlock()
@@ -192,51 +168,55 @@ func New(opts ...func(*Proxy)) (*Proxy, error) {
 }
 
 func (r *Proxy) Close() {
-	if r.conn != nil {
-		r.conn.Close()
-	}
+	// if r.conn != nil {
+	// 	r.conn.Close()
+	// }
 }
 
-func (r *Proxy) getInfo() error {
-	infoURL := fmt.Sprintf("http://%s:%d/info", r.host, r.port)
+// get the serialized representation of the local rotator object and set the
+// same parameters in our proxy Object
+func (r *Proxy) getObject() error {
+
+	url := fmt.Sprintf("http://%s:%d/api/rotators", r.host, r.port)
 
 	c := &http.Client{Timeout: 3 * time.Second}
-	resp, err := c.Get(infoURL)
+	resp, err := c.Get(url)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
-	infos := []rotator.Info{}
+	rotators := rotator.Objects{}
 
-	if err := json.NewDecoder(resp.Body).Decode(&infos); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&rotators); err != nil {
 		return err
 	}
 
-	if len(infos) > 1 {
-		return fmt.Errorf("expected information of 1 rotator, but got %d", len(infos))
+	if len(rotators) == 0 {
+		return fmt.Errorf("incompatible rotator at %v:%v", r.host, r.port)
 	}
 
-	r.name = infos[0].Name
-	r.hasAzimuth = infos[0].HasAzimuth
-	r.hasElevation = infos[0].HasElevation
-	r.azimuthMin = infos[0].AzimuthMin
-	r.azimuthMax = infos[0].AzimuthMax
-	r.azimuthStop = infos[0].AzimuthStop
-	r.elevationMin = infos[0].ElevationMin
-	r.elevationMax = infos[0].ElevationMax
-	r.azimuth = infos[0].Azimuth
-	r.azPreset = infos[0].AzPreset
-	r.elevation = infos[0].Elevation
-	r.elPreset = infos[0].ElPreset
+	if len(rotators) > 1 {
+		return fmt.Errorf("expected information of 1 rotator, but got %d", len(rotators))
+	}
+
+	// there is only one rotator in the dict
+	for _, pr := range rotators {
+		r.name = pr.Name
+		r.hasAzimuth = pr.Config.HasAzimuth
+		r.hasElevation = pr.Config.HasElevation
+		r.azimuthMin = pr.Config.AzimuthMin
+		r.azimuthMax = pr.Config.AzimuthMax
+		r.azimuthStop = pr.Config.AzimuthStop
+		r.elevationMin = pr.Config.ElevationMin
+		r.elevationMax = pr.Config.ElevationMax
+		r.azimuth = pr.Heading.Azimuth
+		r.azPreset = pr.Heading.AzPreset
+		r.elevation = pr.Heading.Elevation
+		r.elPreset = pr.Heading.ElPreset
+	}
 
 	return nil
-}
-
-func (r *Proxy) write(s rotator.Status) error {
-	r.wsWriteMutex.Lock()
-	defer r.wsWriteMutex.Unlock()
-	return r.conn.WriteJSON(s)
 }
 
 func (r *Proxy) Name() string {
@@ -270,12 +250,14 @@ func (r *Proxy) AzPreset() int {
 }
 
 func (r *Proxy) SetAzimuth(az int) error {
-	req := rotator.Request{
-		HasAzimuth: true,
-		Azimuth:    az,
+
+	azPut := rotator.AzimuthPut{
+		Azimuth: &az,
 	}
 
-	return r.conn.WriteJSON(req)
+	url := fmt.Sprintf("http://%s:%d/api/rotator/%s/azimuth", r.host, r.port, r.name)
+
+	return putRequest(url, &azPut)
 }
 
 func (r *Proxy) Elevation() int {
@@ -291,73 +273,94 @@ func (r *Proxy) ElPreset() int {
 }
 
 func (r *Proxy) SetElevation(el int) error {
-	req := rotator.Request{
-		HasElevation: true,
-		Elevation:    el,
+
+	elPut := rotator.ElevationPut{
+		Elevation: &el,
 	}
 
-	return r.conn.WriteJSON(req)
+	url := fmt.Sprintf("http://%s:%d/api/rotator/%s/elevation", r.host, r.port, r.name)
+
+	return putRequest(url, &elPut)
 }
 
 func (r *Proxy) StopAzimuth() error {
-	req := rotator.Request{
-		StopAzimuth: true,
-	}
 
-	return r.conn.WriteJSON(req)
+	url := fmt.Sprintf("http://%s:%d/api/rotator/%s/stop_azimuth", r.host, r.port, r.name)
+
+	return putRequest(url, struct{}{})
 }
 
 func (r *Proxy) StopElevation() error {
-	req := rotator.Request{
-		StopElevation: true,
-	}
+	url := fmt.Sprintf("http://%s:%d/api/rotator/%s/stop_elevation", r.host, r.port, r.name)
 
-	return r.conn.WriteJSON(req)
+	return putRequest(url, struct{}{})
 }
 
 func (r *Proxy) Stop() error {
-	req := rotator.Request{
-		Stop: true,
-	}
+	url := fmt.Sprintf("http://%s:%d/api/rotator/%s/stop", r.host, r.port, r.name)
 
-	return r.conn.WriteJSON(req)
+	return putRequest(url, struct{}{})
 }
 
-func (r *Proxy) Status() rotator.Status {
+// Serialize the data of the rotator
+func (r *Proxy) Serialize() rotator.Object {
 	r.RLock()
 	defer r.RUnlock()
-
-	return rotator.Status{
-		Name:           r.name,
-		Azimuth:        r.azimuth,
-		AzPreset:       r.azPreset,
-		AzimuthOverlap: r.azimuthOverlap,
-		Elevation:      r.elevation,
-		ElPreset:       r.elPreset,
-	}
+	return r.serialize()
 }
 
-func (r *Proxy) ExecuteRequest(req rotator.Request) error {
-	return r.conn.WriteJSON(req)
+func (r *Proxy) serialize() rotator.Object {
+
+	obj := rotator.Object{
+		Name: r.name,
+		Heading: rotator.Heading{
+			Azimuth:   int(r.azimuth),
+			AzPreset:  int(r.azPreset),
+			Elevation: int(r.elevation),
+			ElPreset:  int(r.elPreset),
+		},
+		Config: rotator.Config{
+			HasAzimuth:   r.hasAzimuth,
+			HasElevation: r.hasElevation,
+			AzimuthMax:   r.azimuthMax,
+			AzimuthMin:   r.azimuthMin,
+			AzimuthStop:  r.azimuthStop,
+			ElevationMax: r.elevationMax,
+			ElevationMin: r.elevationMin,
+		},
+	}
+
+	return obj
 }
 
-func (r *Proxy) Info() rotator.Info {
-	r.RLock()
-	defer r.RUnlock()
+// putRequest executes an HTTP put request.
+func putRequest(url string, data interface{}) error {
 
-	return rotator.Info{
-		Name:           r.name,
-		HasAzimuth:     r.hasAzimuth,
-		HasElevation:   r.hasElevation,
-		AzimuthMin:     r.azimuthMin,
-		AzimuthMax:     r.azimuthMax,
-		AzimuthStop:    r.azimuthStop,
-		AzimuthOverlap: r.azimuthOverlap,
-		ElevationMin:   r.elevationMin,
-		ElevationMax:   r.elevationMax,
-		Azimuth:        r.azimuth,
-		AzPreset:       r.azPreset,
-		Elevation:      r.elevation,
-		ElPreset:       r.elPreset,
+	b := new(bytes.Buffer)
+	json.NewEncoder(b).Encode(data)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+
+	req, err := http.NewRequest("PUT", url, b)
+	if err != nil {
+		return err
 	}
+
+	req = req.WithContext(ctx)
+
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return (err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unable to set azimuth. http error code is %v", resp.StatusCode)
+	}
+
+	return nil
 }

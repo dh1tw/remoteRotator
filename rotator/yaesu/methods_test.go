@@ -3,6 +3,7 @@ package yaesu
 import (
 	"bytes"
 	"regexp"
+	"runtime"
 	"testing"
 
 	"github.com/dh1tw/remoteRotator/rotator"
@@ -297,31 +298,27 @@ func TestRotatorStop(t *testing.T) {
 
 func TestParseMsg(t *testing.T) {
 
-	bothCb := func(r rotator.Rotator, ev rotator.Event, v ...interface{}) {
-		if ev != rotator.Azimuth && ev != rotator.Elevation {
-			t.Fatalf("expected event 'Azimuth' or 'Elevation', got: %v", ev)
-		}
-		az := v[0].(rotator.Status).Azimuth
-		el := v[0].(rotator.Status).Elevation
-		if az <= 0 {
-			t.Fatalf("expected value must be > 0, got %v", az)
-		}
-		if el < 0 {
-			t.Fatalf("expected value must be > 0, got %v", el)
-		}
+	bothCb := func(r rotator.Rotator, h rotator.Heading) {
 
+		if h.Azimuth <= 0 {
+			t.Fatalf("expected value must be > 0, got %v", h.Azimuth)
+		}
+		if h.Elevation < 0 {
+			t.Fatalf("expected value must be > 0, got %v", h.Elevation)
+		}
 	}
 
 	tt := []struct {
 		name      string
 		input     string
-		evHandler func(rotator.Rotator, rotator.Event, ...interface{})
+		evHandler func(rotator.Rotator, rotator.Heading)
 	}{
 		{"azimuth", "+0030", bothCb},
 		{"elevation", "+0030+0090", bothCb},
 		{"prompt", "?>", nil},
 		{"garbage", "der43$§PkoJOIo;\n\r", nil},
 	}
+
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			headingPattern, err := regexp.Compile("[\\d]{4}")
@@ -333,60 +330,6 @@ func TestParseMsg(t *testing.T) {
 				headingPattern: headingPattern,
 			}
 			yaesu.parseMsg(tc.input)
-		})
-	}
-}
-
-func TestSetValueAndCallEvent(t *testing.T) {
-
-	azCb := func(r rotator.Rotator, ev rotator.Event, v ...interface{}) {
-		if ev != rotator.Azimuth {
-			t.Fatalf("expected event 'Azimuth', got: %v", ev)
-		}
-		if v[0].(rotator.Status).Azimuth != 30 {
-			t.Fatalf("expected value must be 30, got %v", v[0])
-		}
-	}
-
-	elCb := func(r rotator.Rotator, ev rotator.Event, v ...interface{}) {
-		if ev != rotator.Elevation {
-			t.Fatalf("expected event 'Elevation', got: %v", ev)
-		}
-		if v[0].(rotator.Status).Elevation != 60 {
-			t.Fatalf("expected value must be 30, got %v", v[0])
-		}
-	}
-
-	tt := []struct {
-		name      string
-		event     rotator.Event
-		value     int
-		evHandler func(rotator.Rotator, rotator.Event, ...interface{})
-	}{
-		{"azimuth", rotator.Azimuth, 30, azCb},
-		{"elevation", rotator.Elevation, 60, elCb},
-	}
-	for _, tc := range tt {
-		t.Run(tc.name, func(t *testing.T) {
-
-			yaesu := &Yaesu{
-				eventHandler: tc.evHandler,
-			}
-			yaesu.setValueAndCallEvent(tc.event, tc.value)
-
-			if tc.event == rotator.Azimuth {
-				if yaesu.Azimuth() != tc.value {
-					t.Fatalf("expected %v value %d, but got %d",
-						tc.name, tc.value, yaesu.Azimuth())
-				}
-			}
-
-			if tc.event == rotator.Elevation {
-				if yaesu.Elevation() != tc.value {
-					t.Fatalf("expected %v value %d, but got %d",
-						tc.name, tc.value, yaesu.Azimuth())
-				}
-			}
 		})
 	}
 }
@@ -449,21 +392,26 @@ func TestNewYaesuPortNotExist(t *testing.T) {
 
 	tt := []struct {
 		name     string
+		os       string
 		portName func(*Yaesu)
 		expError string
-		altError string
 	}{
-		{"port does not exist", Portname("/dev/ttyXXXXX"), "open /dev/ttyXXXXX: no such file or directory", ""},
-		{"invalid serial port", Portname("/dev/null"), "File is not a tty", "inappropriate ioctl for device"},
+		{"port does not exist", "linux", Portname("/dev/ttyXXXXX"), "open /dev/ttyXXXXX: no such file or directory"},
+		{"port does not exist", "darwin", Portname("/dev/ttyXXXXX"), "open /dev/ttyXXXXX: no such file or directory"},
+		{"port does not exist", "windows", Portname("/dev/ttyXXXXX"), "The system cannot find the path specified."},
+		{"invalid serial port", "linux", Portname("/dev/null"), "inappropriate ioctl for device"},
+		{"invalid serial port", "darwin", Portname("/dev/null"), "File is not a tty"},
+		{"invalid serial port", "windows", Portname("/dev/null"), "The system cannot find the path specified."},
 	}
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
+			if runtime.GOOS != tc.os {
+				t.Skip()
+			}
 			_, err := New(tc.portName)
 			if err.Error() != tc.expError {
-				if err.Error() != tc.altError {
-					t.Fatalf("expected error '%s', got '%s'", tc.expError, err.Error())
-				}
+				t.Fatalf("expected error '%s', got '%s'", tc.expError, err.Error())
 			}
 		})
 	}

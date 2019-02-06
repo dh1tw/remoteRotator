@@ -34,7 +34,7 @@ type Yaesu struct {
 	elInitialized   bool
 	pollingInterval time.Duration
 	pollingTicker   *time.Ticker
-	eventHandler    func(rotator.Rotator, rotator.Event, ...interface{})
+	eventHandler    func(rotator.Rotator, rotator.Heading)
 	sp              io.ReadWriteCloser
 	spPortName      string
 	spBaudrate      int
@@ -46,105 +46,9 @@ type Yaesu struct {
 	watchdogTs      time.Time
 }
 
-// Name is a functional option to set the name of the rotator
-func Name(name string) func(*Yaesu) {
-	return func(r *Yaesu) {
-		r.name = name
-	}
-}
-
-// HasAzimuth is a functional option to enable Azimuth
-func HasAzimuth(set bool) func(*Yaesu) {
-	return func(r *Yaesu) {
-		r.hasAzimuth = set
-	}
-}
-
-// HasElevation is a functional option to enable Elevation
-func HasElevation(set bool) func(*Yaesu) {
-	return func(r *Yaesu) {
-		r.hasElevation = set
-	}
-}
-
-// UpdateInterval is a functional option the set the frequency
-// by which the rotator will be queried
-func UpdateInterval(d time.Duration) func(*Yaesu) {
-	return func(r *Yaesu) {
-		r.pollingInterval = d
-	}
-}
-
-// EventHandler sets a callback function through which the rotator
-// will report Event
-func EventHandler(h func(rotator.Rotator, rotator.Event, ...interface{})) func(*Yaesu) {
-	return func(r *Yaesu) {
-		r.eventHandler = h
-	}
-}
-
-// Baudrate is a functional option to set the baurate of the serial port.
-func Baudrate(baudrate int) func(*Yaesu) {
-	return func(r *Yaesu) {
-		r.spBaudrate = baudrate
-	}
-}
-
-// Portname is a functional option to set the portname of the serial port.
-// On Windows this will be "COMx", on Linux & MacOS "/dev/tty/xxx"
-func Portname(pn string) func(*Yaesu) {
-	return func(r *Yaesu) {
-		r.spPortName = pn
-	}
-}
-
-// AzimuthMin is a functional option to set the minimum azimuth angle.
-func AzimuthMin(min int) func(*Yaesu) {
-	return func(r *Yaesu) {
-		r.azimuthMin = min
-	}
-}
-
-// AzimuthMax is a functional option to set the maximum azimuth angle.
-func AzimuthMax(max int) func(*Yaesu) {
-	return func(r *Yaesu) {
-		r.azimuthMax = max
-	}
-}
-
-// AzimuthStop is a functional option to set the mechanical stop of the rotator.
-func AzimuthStop(stop int) func(*Yaesu) {
-	return func(r *Yaesu) {
-		r.azimuthStop = stop
-	}
-}
-
-// ElevationMin is a functional option to set the minimum elevation angle.
-func ElevationMin(min int) func(*Yaesu) {
-	return func(r *Yaesu) {
-		r.elevationMin = min
-	}
-}
-
-// ElevationMax is a functional option to set the maximum elevation angle.
-func ElevationMax(max int) func(*Yaesu) {
-	return func(r *Yaesu) {
-		r.elevationMax = max
-	}
-}
-
-// ErrorCh is a functional option allows you to pass a channel to the rotator.
-// The channel will be closed when an internal error occures.
-func ErrorCh(ch chan struct{}) func(*Yaesu) {
-	return func(r *Yaesu) {
-		r.errorCh = ch
-	}
-}
-
-// NewYaesu creates a new Yaesu object which satisfies implicitely the
-// rotator.Rotator interface. Configuration settings are set through functional
-// options. The the Yaesu can not be initialized nil and the corresponding error
-// will be returned.
+// New creates a new Yaesu object which satisfies implicitly the
+// rotator.Rotator interface. Configuration settings can be set through
+// functional options.
 // Default settings are:
 // hasAzimuth: true,
 // portname: /dev/ttyACM0,
@@ -166,6 +70,7 @@ func New(opts ...func(*Yaesu)) (*Yaesu, error) {
 		headingPattern:  headingPattern,
 		azimuthMax:      450,
 		elevationMax:    180,
+		closeCh:         make(chan struct{}),
 	}
 
 	for _, opt := range opts {
@@ -193,7 +98,7 @@ func New(opts ...func(*Yaesu)) (*Yaesu, error) {
 	return r, nil
 }
 
-// Close shutdowns the rotator object and prepares it for garbage collection
+// Close shuts down the object
 func (r *Yaesu) Close() {
 	r.Lock()
 	defer r.Unlock()
@@ -226,7 +131,7 @@ func (r *Yaesu) checkWatchdog() bool {
 	return false
 }
 
-// Start starts the main event loop for the serial port.
+// Start the main event loop for the serial port.
 // It will query the Yaesu rotator for the current heading (azimuth + elevation)
 // with the pollingrate defined during initialization.
 // A watchdog detects if the Yaesu rotator does not respond anymore.
@@ -244,7 +149,6 @@ func (r *Yaesu) start() {
 	for {
 		select {
 		case <-r.pollingTicker.C:
-			// fmt.Println("tick")
 			if err := r.query(); err != nil {
 				fmt.Println("serial port write error:", err)
 				close(r.errorCh)
@@ -255,6 +159,8 @@ func (r *Yaesu) start() {
 				close(r.errorCh)
 				return
 			}
+		// when closing has been signaled, stop polling and
+		// reading from the serial port by exiting this function
 		case <-r.closeCh:
 			return
 		default:
@@ -263,7 +169,8 @@ func (r *Yaesu) start() {
 
 		msg, err := r.read()
 		if err != nil {
-			// Timeout... continue
+			// serialport read is expected to timeout after 100ms
+			// to unblock this routine
 			if err == io.EOF {
 				continue
 			}
@@ -303,54 +210,47 @@ func (r *Yaesu) write(data []byte) (int, error) {
 func (r *Yaesu) parseMsg(msg string) {
 
 	headings := []string{}
+	gotNewValue := false
 
 	if r.headingPattern != nil {
 		headings = r.headingPattern.FindAllString(msg, -1)
 	}
 
+	r.Lock()
+	defer r.Unlock()
+
 	if len(headings) > 0 {
 		//contains always 4 digits
 		az, _ := strconv.Atoi(headings[0][1:]) //discard the first digit, since it's always 0
-		r.setValueAndCallEvent(rotator.Azimuth, az)
+
+		if !r.azInitialized {
+			r.azPreset = az
+			r.azInitialized = true
+			gotNewValue = true
+		}
+
+		if r.azimuth != az {
+			r.azimuth = az
+			gotNewValue = true
+		}
 	}
 
 	if len(headings) == 2 {
 		// contains always 4 digits
 		el, _ := strconv.Atoi(headings[1][1:])
-		r.setValueAndCallEvent(rotator.Elevation, el)
-	}
-}
 
-// verify if the data has changed. If so, notify the application through
-// the callback
-func (r *Yaesu) setValueAndCallEvent(ev rotator.Event, value int) {
-	r.Lock()
-	defer r.Unlock()
-
-	switch ev {
-	case rotator.Azimuth:
-		if !r.azInitialized {
-			r.azPreset = value
-			r.azInitialized = true
-		}
-		if r.azimuth != value {
-			r.azimuth = value
-			if r.eventHandler != nil {
-				// cb launched async to avoid deadlock on yaesu.*()
-				go r.eventHandler(r, rotator.Azimuth, r.serialize())
-			}
-		}
-	case rotator.Elevation:
 		if !r.elInitialized {
-			r.elPreset = value
+			r.elPreset = el
 			r.elInitialized = true
 		}
-		if r.elevation != value {
-			r.elevation = value
-			if r.eventHandler != nil {
-				// cb launched async to avoid deadlock on yaesu.*()
-				go r.eventHandler(r, rotator.Elevation, r.serialize())
-			}
+
+		if r.elevation != el {
+			r.elevation = el
+		}
+
+		if r.eventHandler != nil && gotNewValue {
+			// cb launched async to avoid deadlock on yaesu.*()
+			go r.eventHandler(r, r.serialize().Heading)
 		}
 	}
 }
@@ -508,79 +408,34 @@ func (r *Yaesu) StopElevation() error {
 	return nil
 }
 
-// Status returns a a rotator.Status struct with the information
-// of this rotator.
-func (r *Yaesu) Status() rotator.Status {
+// Serialize the data of the rotator
+func (r *Yaesu) Serialize() rotator.Object {
 	r.RLock()
 	defer r.RUnlock()
+
 	return r.serialize()
 }
 
-func (r *Yaesu) serialize() rotator.Status {
-	return rotator.Status{
-		Name:           r.name,
-		Azimuth:        r.azimuth,
-		AzPreset:       r.azPreset,
-		AzimuthOverlap: r.azimuthOverlap,
-		Elevation:      r.elevation,
-		ElPreset:       r.elPreset,
-	}
-}
+func (r *Yaesu) serialize() rotator.Object {
 
-// ExecuteRequest takes a request struct and sets the new values
-func (r *Yaesu) ExecuteRequest(req rotator.Request) error {
-	if req.HasAzimuth {
-		if err := r.SetAzimuth(req.Azimuth); err != nil {
-			return err
-		}
-	}
-
-	if req.HasElevation {
-		if err := r.SetElevation(req.Elevation); err != nil {
-			return err
-		}
+	obj := rotator.Object{
+		Name: r.name,
+		Heading: rotator.Heading{
+			Azimuth:   r.azimuth,
+			AzPreset:  r.azPreset,
+			Elevation: r.elevation,
+			ElPreset:  r.elPreset,
+		},
+		Config: rotator.Config{
+			HasAzimuth:   r.hasAzimuth,
+			AzimuthMax:   r.azimuthMax,
+			AzimuthMin:   r.azimuthMin,
+			AzimuthStop:  r.azimuthStop,
+			HasElevation: r.hasElevation,
+			ElevationMax: r.elevationMax,
+			ElevationMin: r.elevationMin,
+		},
 	}
 
-	if req.StopAzimuth {
-		if err := r.StopAzimuth(); err != nil {
-			return err
-		}
-	}
-
-	if req.StopElevation {
-		if err := r.StopElevation(); err != nil {
-			return err
-		}
-	}
-
-	if req.Stop {
-		if err := r.Stop(); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// Info returns a rotator.Info struct with the current values of the rotator
-func (r *Yaesu) Info() rotator.Info {
-	r.RLock()
-	defer r.RUnlock()
-
-	info := rotator.Info{
-		Name:           r.name,
-		HasAzimuth:     r.hasAzimuth,
-		HasElevation:   r.hasElevation,
-		AzimuthMin:     r.azimuthMin,
-		AzimuthMax:     r.azimuthMax,
-		AzimuthStop:    r.azimuthStop,
-		AzimuthOverlap: r.azimuthOverlap,
-		ElevationMin:   r.elevationMin,
-		ElevationMax:   r.elevationMax,
-		Azimuth:        r.azimuth,
-		AzPreset:       r.azPreset,
-		Elevation:      r.elevation,
-		ElPreset:       r.elPreset,
-	}
-	return info
+	return obj
 }
