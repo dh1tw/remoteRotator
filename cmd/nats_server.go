@@ -139,10 +139,24 @@ func natsServer(cmd *cobra.Command, args []string) {
 	nopts.Servers = []string{addr}
 	nopts.User = username
 	nopts.Password = password
+	nopts.Timeout = time.Second * 10
+
+	connClosed := make(chan struct{})
+
+	disconnectedHdlr := func(conn *nats.Conn) {
+		log.Println("connection to nats broker closed")
+		connClosed <- struct{}{}
+	}
+
+	errorHdlr := func(conn *nats.Conn, sub *nats.Subscription, err error) {
+		log.Printf("Error Handler called (%s): %s", sub.Subject, err)
+	}
+	nopts.AsyncErrorCB = errorHdlr
 
 	regNatsOpts := nopts
 	brNatsOpts := nopts
 	trNatsOpts := nopts
+	regNatsOpts.DisconnectedCB = disconnectedHdlr
 	// we want to set the nats.Options.Name so that we can distinguish
 	// them when monitoring the nats server with nats-top
 	regNatsOpts.Name = serviceName + ":registry"
@@ -214,6 +228,9 @@ func natsServer(cmd *cobra.Command, args []string) {
 		for {
 			select {
 			case <-rotatorError:
+				rs.Server().Stop()
+				os.Exit(1)
+			case <-connClosed:
 				rs.Server().Stop()
 				os.Exit(1)
 			}
