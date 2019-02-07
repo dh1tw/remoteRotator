@@ -36,6 +36,8 @@ type Yaesu struct {
 	pollingTicker   *time.Ticker
 	eventHandler    func(rotator.Rotator, rotator.Heading)
 	sp              io.ReadWriteCloser
+	spRead          sync.Mutex
+	spWrite         sync.Mutex
 	spPortName      string
 	spBaudrate      int
 	closeCh         chan struct{}
@@ -146,27 +148,20 @@ func (r *Yaesu) start() {
 	r.watchdogTs = time.Now()
 	r.Unlock()
 
+	// start async polling
+	go r.poll()
+
 	for {
 		select {
-		case <-r.pollingTicker.C:
-			if err := r.query(); err != nil {
-				fmt.Println("serial port write error:", err)
-				close(r.errorCh)
-				return
-			}
-			if r.checkWatchdog() {
-				fmt.Println("communication lost with Yaesu rotator")
-				close(r.errorCh)
-				return
-			}
-		// when closing has been signaled, stop polling and
-		// reading from the serial port by exiting this function
+		// when closing has been signaled, stop reading
+		// from the serial port by exiting this function
 		case <-r.closeCh:
 			return
 		default:
-			// pass
 		}
 
+		// this is a blocking function which will run eventually
+		// into a timeout if no data is received
 		msg, err := r.read()
 		if err != nil {
 			// serialport read is expected to timeout after 100ms
@@ -184,24 +179,48 @@ func (r *Yaesu) start() {
 	}
 }
 
+// poll the Yaesu rotator for the current heading (azimuth + elevation)
+func (r *Yaesu) poll() {
+	defer r.Close()
+
+	for {
+		select {
+		case <-r.pollingTicker.C:
+			if err := r.query(); err != nil {
+				fmt.Println("serial port write error:", err)
+				close(r.errorCh)
+				return
+			}
+			if r.checkWatchdog() {
+				fmt.Println("communication lost with Yaesu rotator")
+				close(r.errorCh)
+				return
+			}
+		// when closing has been signaled, stop polling and return
+		case <-r.closeCh:
+			return
+		}
+	}
+}
+
 // read from the Yaesu rotator through this wrapper function
 func (r *Yaesu) read() (string, error) {
-	r.Lock()
-	defer r.Unlock()
+	r.spRead.Lock()
+	defer r.spRead.Unlock()
 	return bufio.NewReader(r.sp).ReadString('\n')
 }
 
 // request Azimuth + Elevation from Yaesu rotator
 func (r *Yaesu) query() error {
 	//query azimuth + elevation
-	r.Lock()
-	defer r.Unlock()
 	_, err := r.write([]byte("C2\r\n"))
 	return err
 }
 
 // all functions write to the Yaesu rotator / serial port through this wrapper function
 func (r *Yaesu) write(data []byte) (int, error) {
+	r.spWrite.Lock()
+	defer r.spWrite.Unlock()
 	return r.sp.Write(data)
 }
 
