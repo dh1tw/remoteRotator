@@ -12,10 +12,10 @@ import (
 	"github.com/micro/go-micro/broker"
 	"github.com/micro/go-micro/client"
 	"github.com/micro/go-micro/registry"
+	"github.com/micro/go-micro/selector/static"
 	"github.com/micro/go-micro/transport"
 	natsBroker "github.com/micro/go-plugins/broker/nats"
 	natsReg "github.com/micro/go-plugins/registry/nats"
-	"github.com/micro/go-plugins/selector/named"
 	natsTr "github.com/micro/go-plugins/transport/nats"
 	nats "github.com/nats-io/go-nats"
 	"github.com/spf13/cobra"
@@ -133,7 +133,8 @@ func webServer(cmd *cobra.Command, args []string) {
 			client.Registry(reg),
 			client.PoolSize(1),
 			client.PoolTTL(time.Hour*8760), // one year - don't TTL our connection
-			client.Selector(named.NewSelector()),
+			// client.Selector(named.NewSelector()),
+			client.Selector(static.NewSelector()),
 			// client.Selector(cache.NewSelector(selector.Registry(reg))),
 		)
 
