@@ -103,7 +103,12 @@ func New(opts ...func(*Yaesu)) (*Yaesu, error) {
 // Close shuts down the object
 func (r *Yaesu) Close() {
 	r.Lock()
+	r.spRead.Lock()
+	r.spWrite.Lock()
 	defer r.Unlock()
+	defer r.spWrite.Unlock()
+	defer r.spRead.Unlock()
+
 	if r.pollingTicker != nil {
 		r.pollingTicker.Stop()
 	}
