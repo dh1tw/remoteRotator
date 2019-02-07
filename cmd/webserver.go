@@ -106,7 +106,11 @@ func webServer(cmd *cobra.Command, args []string) {
 			log.Println("connection to nats broker closed")
 			connClosed <- struct{}{}
 		}
-		// nopts.DisconnectedCB = disconnectHdlr
+
+		reconnectHdlr := func(conn *nats.Conn) {
+			log.Println("reconnected to nats broker")
+		}
+		nopts.ReconnectedCB = reconnectHdlr
 
 		errorHdlr := func(conn *nats.Conn, sub *nats.Subscription, err error) {
 			log.Printf("Error Handler called (%s): %s", sub.Subject, err)
@@ -117,9 +121,9 @@ func webServer(cmd *cobra.Command, args []string) {
 		brNatsOpts := nopts
 		trNatsOpts := nopts
 		regNatsOpts.DisconnectedCB = disconnectedHdlr
-		regNatsOpts.Name = "remoteRotator.client:registry"
-		brNatsOpts.Name = "remoteRotator.client:broker"
-		trNatsOpts.Name = "remoteRotator.client:transport"
+		regNatsOpts.Name = "remoteRotator.web:registry"
+		brNatsOpts.Name = "remoteRotator.web:broker"
+		trNatsOpts.Name = "remoteRotator.web:transport"
 
 		regTimeout := registry.Timeout(time.Second * 2)
 		trTimeout := transport.Timeout(time.Second * 2)
@@ -133,9 +137,7 @@ func webServer(cmd *cobra.Command, args []string) {
 			client.Registry(reg),
 			client.PoolSize(1),
 			client.PoolTTL(time.Hour*8760), // one year - don't TTL our connection
-			// client.Selector(named.NewSelector()),
 			client.Selector(static.NewSelector()),
-			// client.Selector(cache.NewSelector(selector.Registry(reg))),
 		)
 
 		if err := cl.Init(); err != nil {
@@ -266,7 +268,7 @@ func (w *webserver) addRotator(rotatorServiceName string) error {
 
 	go func() {
 		<-doneCh
-		fmt.Println("disposing:", r.Name())
+		// fmt.Println("disposing:", r.Name())
 		w.RemoveRotator(r)
 	}()
 
