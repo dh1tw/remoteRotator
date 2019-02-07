@@ -2,7 +2,7 @@
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/dh1tw/remoteRotator)](https://goreportcard.com/report/github.com/dh1tw/remoteRotator)
 [![Build Status](https://travis-ci.org/dh1tw/remoteRotator.svg?branch=master)](https://travis-ci.org/dh1tw/remoteRotator)
-[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://img.shields.io/badge/license-MIT-blue.svg) 
+[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://img.shields.io/badge/license-MIT-blue.svg)
 [![Coverage Status](https://coveralls.io/repos/github/dh1tw/remoteRotator/badge.svg?branch=master)](https://coveralls.io/github/dh1tw/remoteRotator?branch=master)
 [![Downloads](https://img.shields.io/github/downloads/dh1tw/remoteRotator/total.svg?maxAge=1800)](https://github.com/dh1tw/remoteRotator/releases)
 
@@ -25,10 +25,10 @@ has been reached.
 
 ## Supported Transportation Protocols
 
+- NATS
+- HTTP + Websockets
 - TCP
-- HTTP
-- Websockets
-- MQTT / NATS (coming soon)
+
 
 ## License
 
@@ -221,15 +221,15 @@ A blue arc segment indicates the mechanical overlap supported by this rotator.
 ![Alt text](https://i.imgur.com/lcHhslZ.png "remoteRotator WebUI")
 
 If you have multiple rotators, you might want to use the dedicated aggregation
-web server. The following example starts the webserver on port 6005 and listens 
+web server. The following example starts the webserver on port 6005 and listens
 on all network interfaces.
 
 ````
-$ remoteRotator web -w "0.0.0.0" -k 6005 
+$ remoteRotator web -w "0.0.0.0" -k 6005
 ````
 
 The Webserver automatically discovers the available remoteRotator instances
-in your local network and adds them from the web interface. Technically the 
+in your local network and adds them from the web interface. Technically the
 discovery process is based on mDNS and doesn't require any configuration.
 
 ## Config file
