@@ -314,7 +314,6 @@ func (w *webserver) watchRegistry() {
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
-		return
 	}
 
 	for {
