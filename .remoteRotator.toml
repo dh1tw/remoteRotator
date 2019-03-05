@@ -12,7 +12,7 @@ port = 3333
 [http]
 enabled = true
 host = "127.0.0.1"
-port = 7070
+port = 7071
 
 [discovery]
 enabled = true
@@ -20,11 +20,11 @@ enabled = true
 [rotator]
 type = "yaesu"
 name = "myRotator"
-portname = "/dev/ttyACM0"
+portname = "COM3"
 baudrate = 9600
 has-azimuth = true
-has-elevation = false
-pollingrate = "1s"
+has-elevation = true
+pollingrate = "5s"
 azimuth-min = 0
 azimuth-max = 360
 azimuth-stop = 0
