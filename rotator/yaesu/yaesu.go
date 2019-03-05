@@ -380,8 +380,7 @@ func (r *Yaesu) SetElevation(el int) error {
 	}
 
 	r.elPreset = el
-
-	//if _, err := r.write([]byte(fmt.Sprintf("N%.3d\r\n",	
+	
 	if _, err := r.write([]byte(fmt.Sprintf("W%.3d %.3d\r\n", r.azPreset, r.elPreset))); 
 	err != nil {
 		return err
