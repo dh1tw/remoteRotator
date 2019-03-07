@@ -1,0 +1,32 @@
+[nats]
+broker-url = "127.0.0.1"
+broker-port = 4222
+username = ""
+password = ""
+
+[tcp]
+enabled = true
+host = "127.0.0.1"
+port = 3333
+
+[http]
+enabled = true
+host = "127.0.0.1"
+port = 7070
+
+[discovery]
+enabled = true
+
+[rotator]
+type = "yaesu"
+name = "myRotator"
+portname = "/dev/ttyACM0"
+baudrate = 9600
+has-azimuth = true
+has-elevation = false
+pollingrate = "1s"
+azimuth-min = 0
+azimuth-max = 360
+azimuth-stop = 0
+elevation-min = 0
+elevation-max = 180
