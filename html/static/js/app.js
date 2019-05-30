@@ -97,21 +97,6 @@ var vm = new Vue({
                         var nextRot = Object.keys(this.azRotators)[0];
                         this.selectedAzRotator = this.azRotators[nextRot];
                     }
-                } else {
-                    // no more rotators left
-                    this.selectedAzRotator = {
-                        name: "n/a",
-                        heading: {
-                            azimuth: 0,
-                            az_preset: 0,
-                        },
-                        config: {
-                            az_stop: 0,
-                            az_min: 0,
-                            az_max: 360,
-                            az_overlap: false,
-                        }
-                    }
                 }
 
                 // check if other elevation rotators are still available
@@ -120,19 +105,6 @@ var vm = new Vue({
                         // pick the first one in the list
                         var nextRot = Object.keys(this.elRotators)[0];
                         this.selectedElRotator = this.elRotators[nextRot];
-                    }
-                } else {
-                    // no more rotators left
-                    this.selectedElRotator = {
-                        name: "n/a",
-                        heading: {
-                            elevation: 0,
-                            el_preset: 0,
-                        },
-                        config: {
-                            el_min: 0,
-                            el_max: 180,
-                        }
                     }
                 }
             }
