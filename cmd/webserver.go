@@ -351,20 +351,6 @@ func (w *webserver) watchRegistry() {
 			delete(w.cache.cache, res.Service.Name)
 			w.cache.Unlock()
 		}
-
-		w.cache.Lock()
-		for service, timeout := range w.cache.cache {
-			if time.Since(timeout) >= w.cache.ttl {
-				rotatorName := nameFromFQSN(service)
-				r, exists := w.Rotator(rotatorName)
-				if !exists {
-					continue
-				}
-				r.Close()
-				delete(w.cache.cache, res.Service.Name)
-			}
-		}
-		w.cache.Unlock()
 	}
 }
 
