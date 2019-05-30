@@ -17,7 +17,7 @@ import (
 	natsBroker "github.com/micro/go-plugins/broker/nats"
 	natsReg "github.com/micro/go-plugins/registry/nats"
 	natsTr "github.com/micro/go-plugins/transport/nats"
-	nats "github.com/nats-io/go-nats"
+	nats "github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -147,7 +147,7 @@ func webServer(cmd *cobra.Command, args []string) {
 	}
 
 	cache := &serviceCache{
-		ttl:   time.Second * 20,
+		ttl:   time.Second * 10,
 		cache: make(map[string]time.Time),
 	}
 	w := webserver{h, cl, cache}
@@ -164,7 +164,10 @@ func webServer(cmd *cobra.Command, args []string) {
 		if err := w.listAndAddRotators(); err != nil {
 			log.Println(err)
 		}
+		// from now on watch the registry in a separate go-routine for changes
 		go w.watchRegistry()
+		// check regularily if the proxy objects are still alive
+		go w.checkTimeout()
 	}
 
 	// ticker for check lan registry
@@ -403,5 +406,29 @@ func (w *webserver) update() {
 			<-doneCh
 			w.RemoveRotator(r)
 		}()
+	}
+}
+
+// checkTimeout checks every second if the existing proxy objects
+// are still alive. Dead objects will be removed.
+func (w *webserver) checkTimeout() {
+
+	tick := time.Tick(time.Second)
+
+	for {
+		<-tick
+		w.cache.Lock()
+		for service, timeout := range w.cache.cache {
+			if time.Since(timeout) >= w.cache.ttl {
+				rotatorName := nameFromFQSN(service)
+				r, exists := w.Rotator(rotatorName)
+				if !exists {
+					continue
+				}
+				r.Close()
+				delete(w.cache.cache, service)
+			}
+		}
+		w.cache.Unlock()
 	}
 }
