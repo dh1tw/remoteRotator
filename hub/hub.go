@@ -5,9 +5,10 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"regexp"
 	"sync"
 
-	"github.com/GeertJohan/go.rice"
+	rice "github.com/GeertJohan/go.rice"
 
 	"github.com/dh1tw/remoteRotator/rotator"
 	"github.com/gorilla/mux"
@@ -24,6 +25,8 @@ type Hub struct {
 	rotators       map[string]rotator.Rotator //key: Rotator name
 	router         *mux.Router
 	fileServer     http.Handler
+	apiVersion     string
+	apiMatch       *regexp.Regexp
 }
 
 // NewHub returns the pointer to an initialized Hub object.
@@ -34,6 +37,8 @@ func NewHub(rotators ...rotator.Rotator) (*Hub, error) {
 		wsClients:      make(map[*WsClient]bool),
 		closeWsClient:  make(chan *WsClient),
 		rotators:       make(map[string]rotator.Rotator),
+		apiVersion:     "1.0",
+		apiMatch:       regexp.MustCompile(`api\/v\d\.\d\/`),
 	}
 
 	for _, r := range rotators {
@@ -241,7 +246,7 @@ func (hub *Hub) ListenHTTP(host string, port int, errorCh chan<- struct{}) {
 	// Listen for incoming connections.
 	log.Printf("listening on %s:%d for HTTP connections\n", host, port)
 
-	err := http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), hub.router)
+	err := http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), hub.apiRedirectRouter(hub.router))
 	if err != nil {
 		log.Println(err)
 		return
