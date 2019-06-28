@@ -11,8 +11,8 @@ import (
 
 	"github.com/micro/go-micro/broker"
 	"github.com/micro/go-micro/client"
+	"github.com/micro/go-micro/client/selector/static"
 	"github.com/micro/go-micro/registry"
-	"github.com/micro/go-micro/selector/static"
 	"github.com/micro/go-micro/transport"
 	natsBroker "github.com/micro/go-plugins/broker/nats"
 	natsReg "github.com/micro/go-plugins/registry/nats"
