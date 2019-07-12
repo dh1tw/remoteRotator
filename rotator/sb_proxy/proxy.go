@@ -76,7 +76,7 @@ func (r *SbProxy) closeDone() {
 	r.doneOnce.Do(func() { close(r.doneCh) })
 }
 
-func (r *SbProxy) updateHandler(p broker.Publication) error {
+func (r *SbProxy) updateHandler(p broker.Event) error {
 
 	state := sbRotator.State{}
 	err := proto.Unmarshal(p.Message().Body, &state)
