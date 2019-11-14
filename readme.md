@@ -1,7 +1,7 @@
 # RemoteRotator
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/dh1tw/remoteRotator)](https://goreportcard.com/report/github.com/dh1tw/remoteRotator)
-[![Build Status](https://travis-ci.org/dh1tw/remoteRotator.svg?branch=master)](https://travis-ci.org/dh1tw/remoteRotator)
+[![Build Status](https://travis-ci.com/dh1tw/remoteRotator.svg?branch=master)](https://travis-ci.com/dh1tw/remoteRotator)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://img.shields.io/badge/license-MIT-blue.svg)
 [![Coverage Status](https://coveralls.io/repos/github/dh1tw/remoteRotator/badge.svg?branch=master)](https://coveralls.io/github/dh1tw/remoteRotator?branch=master)
 [![Downloads](https://img.shields.io/github/downloads/dh1tw/remoteRotator/total.svg?maxAge=1800)](https://github.com/dh1tw/remoteRotator/releases)
