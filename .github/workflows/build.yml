@@ -54,17 +54,6 @@ jobs:
         GOARCH: ${{ matrix.GOARCH }}
       run: make dist
     -
-      # Test on the native platform (linux/amd64)
-      # Then upload the code coverage to Coveralls.io
-      name: Test
-      if: (matrix.GOOS == 'linux') && (matrix.GOARCH == 'amd64')
-      env:
-        COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        go test -race -covermode atomic ./...
-        GO111MODULE=off go get github.com/mattn/goveralls
-        $(go env GOPATH)/bin/goveralls -coverprofile=profile.cov -service=github
-    -
       name: Prepare build artifact for stashing
       run: |
         mkdir release
@@ -162,9 +151,6 @@ jobs:
         GOARCH: amd64
       run: make dist
     -
-      name: Test (with race condition detector)
-      run: go test -v -race ./...
-    -
       name: Prepare build artifact for stashing
       run: |
         mkdir release
@@ -177,11 +163,72 @@ jobs:
         name: remoteRotator-darwin-amd64-${{ github.sha }}
         path: ./release
 
+  test_linux:
+    runs-on: ubuntu-18.04
+    steps:
+    -
+      name: Set up Go 1.13
+      uses: actions/setup-go@v1
+      id: go
+      with:
+        go-version: 1.13
+    -
+      name: Checkout source code
+      uses: actions/checkout@v1
+      with:
+        submodules: true
+    -
+      name: Install dependencies
+      run: |
+        make install-deps
+    -
+      name: Generate adapter code
+      run: |
+        export PATH=/home/runner/go/bin:$PATH
+        make generate
+    -
+      # Test on the native platform (linux/amd64)
+      # Then upload the code coverage to Coveralls.io
+      name: Test
+      env:
+        COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        go test -race -covermode atomic -coverprofile=profile.cov ./...
+        GO111MODULE=off go get github.com/mattn/goveralls
+        $(go env GOPATH)/bin/goveralls -coverprofile=profile.cov -service=github
+
+  test_macos:
+    runs-on: macos-latest
+    steps:
+    -
+      name: Set up Go 1.13
+      uses: actions/setup-go@v1
+      id: go
+      with:
+        go-version: 1.13
+    -
+      name: Checkout source code
+      uses: actions/checkout@v1
+      with:
+        submodules: true
+    -
+      name: Install dependencies
+      run: |
+        make install-deps
+    -
+      name: Generate adapter code
+      run: |
+        export PATH=/System/Volumes/Data/Users/runner/go/bin:$PATH
+        make generate
+    -
+      name: Test (with race condition detector)
+      run: go test -v -race ./...
+
   # A Github release is created whenever the git reference contains a tag, starting with 'v*' (e.g. v0.4.2)
   # And the previous build jobs have been successful
   create_release:
     runs-on: ubuntu-18.04
-    needs: [build_linux, build_windows, build_macos]
+    needs: [build_linux, build_windows, build_macos, test_linux, test_macos]
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
     -
@@ -214,7 +261,7 @@ jobs:
     needs: create_release # release must be created before this job can start
     strategy:
       matrix:
-        version: ['linux-arm', 'linux-386', 'linux-386', 'linux-amd64', 'windows-386', 'windows-amd64', 'darwin-amd64']
+        version: ['linux-arm', 'linux-386', 'linux-amd64', 'windows-386', 'windows-amd64', 'darwin-amd64']
         include:
         # add the GO environment variables
           - version: linux-arm
@@ -249,16 +296,16 @@ jobs:
       name: Retrieve stashed intermediary build artifact
       uses: actions/download-artifact@v1
       with:
-        name: remoteAudio-${{ matrix.GOOS }}-${{ matrix.GOARCH }}-${{ github.sha }}
+        name: remoteRotator-${{ matrix.GOOS }}-${{ matrix.GOARCH }}-${{ github.sha }}
     -
       # rename the retrieved intermediary artifact and prepare zip file
       name: Prepare release artifact
       env:
         VERSION: ${{ steps.get_version.outputs.VERSION }}
       run: |
-        mv ./remoteAudio-${{ matrix.GOOS }}-${{ matrix.GOARCH }}-${{ github.sha }}/remoteAudio .
-        chmod +x ./remoteAudio
-        zip -j remoteAudio-$VERSION-${{ matrix.GOOS }}-${{ matrix.GOARCH }}.zip ./remoteAudio
+        mv ./remoteRotator-${{ matrix.GOOS }}-${{ matrix.GOARCH }}-${{ github.sha }}/remoteRotator* .
+        # chmod +x ./remoteRotator
+        zip -j remoteRotator-$VERSION-${{ matrix.GOOS }}-${{ matrix.GOARCH }}.zip ./remoteRotator*
     -
       # Download the previously uploaded artifact which contains the release URL
       name: Retrieve stashed release URL
@@ -278,8 +325,8 @@ jobs:
       env:
         VERSION: ${{ steps.get_version.outputs.VERSION }}
       run: |
-        echo ::set-output name=ARTIFACT_PATH::./remoteAudio-$VERSION-${{ matrix.GOOS }}-${{ matrix.GOARCH }}.zip
-        echo ::set-output name=ARTIFACT_NAME::remoteAudio-$VERSION-${{ matrix.GOOS }}-${{ matrix.GOARCH }}.zip
+        echo ::set-output name=ARTIFACT_PATH::./remoteRotator-$VERSION-${{ matrix.GOOS }}-${{ matrix.GOARCH }}.zip
+        echo ::set-output name=ARTIFACT_NAME::remoteRotator-$VERSION-${{ matrix.GOOS }}-${{ matrix.GOARCH }}.zip
     -
       # Finally upload the artifact to the corresponding release
       name: Upload Release Artifact ${{ matrix.version }}
