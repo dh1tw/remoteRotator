@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+SHELL := /bin/bash
+
 PKG := github.com/dh1tw/remoteRotator
 COMMITID := $(shell git describe --always --long --dirty)
 COMMIT := $(shell git rev-parse --short HEAD)
@@ -7,6 +9,7 @@ VERSION := $(shell git describe --tags)
 
 PKG_LIST := $(shell go list ${PKG}/... | grep -v /vendor/)
 GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/)
+
 all: build
 
 build:
@@ -19,11 +22,13 @@ build:
 generate:
 	go generate ./...
 	cd hub; \
-	rice embed-go 
+	rice embed-go
 
-dist: 
-	go build -v -ldflags="-w -X github.com/dh1tw/remoteRotator/cmd.commitHash=${COMMIT} \
+dist:
+	go build -v -ldflags="-w -s -X github.com/dh1tw/remoteRotator/cmd.commitHash=${COMMIT} \
 		-X github.com/dh1tw/remoteRotator/cmd.version=${VERSION}"
+	# compress binary
+	if [ "${GOOS}" == "windows" ]; then upx remoteRotator.exe; else upx remoteRotator; fi
 
 # test:
 # 	@go test -short ${PKG_LIST}
@@ -38,32 +43,13 @@ lint:
 
 test:
 	go generate ./...
-	go test ./... 
-
-install: 
-	go generate ./...
-	go install -v -ldflags="-w -X github.com/dh1tw/remoteRotator/cmd.commitHash=${COMMIT} \
-		-X github.com/dh1tw/remoteRotator/cmd.version=${VERSION}"
+	go test ./...
 
 install-deps:
 	go get golang.org/x/tools/cmd/stringer
 	go get github.com/GeertJohan/go.rice/rice
-	go get ./...
-
-windows:
-	go generate ./...
-	GOOS=windows GOARCH=386 go get ./...
-	GOOS=windows GOARCH=386 go build -v -ldflags="-w -X github.com/dh1tw/remoteRotator/cmd.commitHash=${COMMIT} \
-		-X github.com/dh1tw/remoteRotator/cmd.version=${VERSION}"
-
-
-# static: vet lint
-# 	go build -i -v -o ${OUT}-v${VERSION} -tags netgo -ldflags="-extldflags \"-static\" -w -s -X main.version=${VERSION}" ${PKG}
-
-server: build
-	./remoteRotator server tcp
 
 clean:
 	-@rm remoteRotator remoteRotator-v*
 
-.PHONY: build server install vet lint clean install-deps generate
+.PHONY: build vet lint clean install-deps generate

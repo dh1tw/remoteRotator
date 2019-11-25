@@ -1,0 +1,293 @@
+name: Cross Platform build
+
+on: [push, pull_request]
+
+jobs:
+  build_linux:
+    runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        version: ['linux-arm', 'linux-386', 'linux-amd64']
+        include:
+        # add the GO environment variables
+          - version: linux-arm
+            GOOS: linux
+            GOARCH: arm
+          - version: linux-386
+            GOOS: linux
+            GOARCH: '386'
+          - version: linux-amd64
+            GOOS: linux
+            GOARCH: amd64
+          - version: windows-386
+            GOOS: windows
+            GOARCH: '386'
+          - version: windows-amd64
+            GOOS: windows
+            GOARCH: amd64
+    steps:
+    -
+      name: Set up Go 1.13
+      uses: actions/setup-go@v1
+      id: go
+      with:
+        go-version: 1.13
+    -
+      name: Checkout source code
+      uses: actions/checkout@v1
+      with:
+        submodules: true
+    -
+      name: Install dependencies
+      run: |
+        sudo apt install upx -y
+        make install-deps
+    -
+      name: Generate adapter code
+      run: |
+        export PATH=/home/runner/go/bin:$PATH
+        make generate
+    -
+      name: Compile
+      env:
+        GOOS: ${{ matrix.GOOS }}
+        GOARCH: ${{ matrix.GOARCH }}
+      run: make dist
+    -
+      # Test on the native platform (linux/amd64)
+      # Then upload the code coverage to Coveralls.io
+      name: Test
+      if: (matrix.GOOS == 'linux') && (matrix.GOARCH == 'amd64')
+      env:
+        COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        go test -race -covermode atomic ./...
+        GO111MODULE=off go get github.com/mattn/goveralls
+        $(go env GOPATH)/bin/goveralls -coverprofile=profile.cov -service=github
+    -
+      name: Prepare build artifact for stashing
+      run: |
+        mkdir release
+        mv ./remoteRotator ./release
+    -
+      # The build artifact can be identified by the trailing sha of the git commit
+      name: Stash the build artifact
+      uses: actions/upload-artifact@v1
+      with:
+        name: remoteRotator-${{ matrix.GOOS }}-${{ matrix.GOARCH }}-${{ github.sha }}
+        path: ./release
+
+  build_windows:
+    runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        version: ['windows-386', 'windows-amd64']
+        include:
+        # add the GO environment variables
+          - version: windows-386
+            GOOS: windows
+            GOARCH: '386'
+          - version: windows-amd64
+            GOOS: windows
+            GOARCH: amd64
+    steps:
+    -
+      name: Set up Go 1.13
+      uses: actions/setup-go@v1
+      id: go
+      with:
+        go-version: 1.13
+    -
+      name: Checkout source code
+      uses: actions/checkout@v1
+      with:
+        submodules: true
+    -
+      name: Install dependencies
+      run: |
+        sudo apt install upx -y
+        make install-deps
+    -
+      name: Generate adapter code
+      run: |
+        export PATH=/home/runner/go/bin:$PATH
+        make generate
+    -
+      name: Compile
+      env:
+        GOOS: ${{ matrix.GOOS }}
+        GOARCH: ${{ matrix.GOARCH }}
+      run: make dist
+    -
+      name: Prepare build artifact for stashing
+      run: |
+        mkdir release
+        mv ./remoteRotator.exe ./release
+    -
+      # The build artifact can be identified by the trailing sha of the git commit
+      name: Stash the build artifact
+      uses: actions/upload-artifact@v1
+      with:
+        name: remoteRotator-${{ matrix.GOOS }}-${{ matrix.GOARCH }}-${{ github.sha }}
+        path: ./release
+
+  build_macos:
+    runs-on: macos-latest
+    steps:
+    -
+      name: Set up Go 1.13
+      uses: actions/setup-go@v1
+      id: go
+      with:
+        go-version: 1.13
+    -
+      name: Checkout source code
+      uses: actions/checkout@v1
+      with:
+        submodules: true
+    -
+      name: Install dependencies
+      run: |
+        brew install upx
+        make install-deps
+    -
+      name: Generate adapter code
+      run: |
+        export PATH=/System/Volumes/Data/Users/runner/go/bin:$PATH
+        make generate
+    -
+      name: Compile
+      env:
+        GOOS: darwin
+        GOARCH: amd64
+      run: make dist
+    -
+      name: Test (with race condition detector)
+      run: go test -v -race ./...
+    -
+      name: Prepare build artifact for stashing
+      run: |
+        mkdir release
+        mv ./remoteRotator ./release
+    -
+      # The build artifact can be identified by the trailing sha of the git commit
+      name: Stash the build artifact
+      uses: actions/upload-artifact@v1
+      with:
+        name: remoteRotator-darwin-amd64-${{ github.sha }}
+        path: ./release
+
+  # A Github release is created whenever the git reference contains a tag, starting with 'v*' (e.g. v0.4.2)
+  # And the previous build jobs have been successful
+  create_release:
+    runs-on: ubuntu-18.04
+    needs: [build_linux, build_windows, build_macos]
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+    -
+      name: Create Release
+      id: create_release
+      uses: actions/create-release@v1.0.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: true
+        prerelease: false
+    -
+      # since jobs can not share any variables we have to copy the URL of the created Github release
+      # into a file and stash it as an artifact
+      name: Copy release URL into file
+      run: |
+        mkdir release
+        printf "%s" "${{ steps.create_release.outputs.upload_url }}" > release/url.txt
+    - name: Stash file containing the release URL as an artifact
+      uses: actions/upload-artifact@v1
+      with:
+        name: release-url
+        path: ./release
+
+  # In this job we upload the release artifacts to the corresponding release
+  upload:
+    runs-on: ubuntu-18.04
+    needs: create_release # release must be created before this job can start
+    strategy:
+      matrix:
+        version: ['linux-arm', 'linux-386', 'linux-386', 'linux-amd64', 'windows-386', 'windows-amd64', 'darwin-amd64']
+        include:
+        # add the GO environment variables
+          - version: linux-arm
+            GOOS: linux
+            GOARCH: arm
+          - version: linux-386
+            GOOS: linux
+            GOARCH: '386'
+          - version: linux-amd64
+            GOOS: linux
+            GOARCH: amd64
+          - version: windows-386
+            GOOS: windows
+            GOARCH: '386'
+          - version: windows-amd64
+            GOOS: windows
+            GOARCH: amd64
+          - version: darwin-amd64
+            GOOS: darwin
+            GOARCH: amd64
+    steps:
+    -
+    # Since Github actions (currently) doesn't provide a slugged version of the git tag we have to
+    # create it by ourselves. It is then made available to other steps in this job as a step.outputs
+    # variable
+      name: Get the version (git tag)
+      id: get_version
+      run: |
+        echo ${GITHUB_REF/refs\/tags\//}
+        echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+    -
+      name: Retrieve stashed intermediary build artifact
+      uses: actions/download-artifact@v1
+      with:
+        name: remoteAudio-${{ matrix.GOOS }}-${{ matrix.GOARCH }}-${{ github.sha }}
+    -
+      # rename the retrieved intermediary artifact and prepare zip file
+      name: Prepare release artifact
+      env:
+        VERSION: ${{ steps.get_version.outputs.VERSION }}
+      run: |
+        mv ./remoteAudio-${{ matrix.GOOS }}-${{ matrix.GOARCH }}-${{ github.sha }}/remoteAudio .
+        chmod +x ./remoteAudio
+        zip -j remoteAudio-$VERSION-${{ matrix.GOOS }}-${{ matrix.GOARCH }}.zip ./remoteAudio
+    -
+      # Download the previously uploaded artifact which contains the release URL
+      name: Retrieve stashed release URL
+      uses: actions/download-artifact@v1
+      with:
+        name: release-url
+    -
+      name: Read release URL
+      # Write content of downloaded file (a string which contains the release URL) into a step.outputs variable
+      id: get_release_url
+      run: echo ::set-output name=URL::$(cat release-url/url.txt)
+    -
+      # This step is only needed because the upload-release-asset currently doesn't support
+      # environment variables. Therefore they must be written and referenced through step.outputs
+      name: Prepare artifact metadata
+      id: prepare_artifact_metadata
+      env:
+        VERSION: ${{ steps.get_version.outputs.VERSION }}
+      run: |
+        echo ::set-output name=ARTIFACT_PATH::./remoteAudio-$VERSION-${{ matrix.GOOS }}-${{ matrix.GOARCH }}.zip
+        echo ::set-output name=ARTIFACT_NAME::remoteAudio-$VERSION-${{ matrix.GOOS }}-${{ matrix.GOARCH }}.zip
+    -
+      # Finally upload the artifact to the corresponding release
+      name: Upload Release Artifact ${{ matrix.version }}
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.get_release_url.outputs.URL }}
+        asset_path: ${{ steps.prepare_artifact_metadata.outputs.ARTIFACT_PATH }}
+        asset_name: ${{ steps.prepare_artifact_metadata.outputs.ARTIFACT_NAME }}
+        asset_content_type: application/gzip
