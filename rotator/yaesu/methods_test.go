@@ -146,15 +146,18 @@ func TestSetAzimuthButNotEnabled(t *testing.T) {
 func TestSetElevation(t *testing.T) {
 
 	tt := []struct {
-		name     string
-		value    int
-		expValue int
-		expMsg   []byte
+		name       string
+		azValue    int
+		elValue    int
+		expAzValue int
+		expElValue int
+		expMsg     []byte
 	}{
-		{"150 deg", 150, 150, []byte("N150\r\n")},
-		{"451 deg", 181, 180, []byte("N180\r\n")},
-		{"-100 deg", -100, 0, []byte("N000\r\n")},
-		{"1000 deg", 1000, 180, []byte("N180\r\n")},
+		{"azimuth 45deg, elevation 150 deg", 45, 150, 45, 150, []byte("W045 150\r\n")},
+		{"azimuth 45deg, elevation 451 deg (positive out of range)", 45, 181, 45, 180, []byte("W045 180\r\n")},
+		{"azimuth 45deg, elevation -100 deg (negative out of range)", 45, -100, 45, 0, []byte("W045 000\r\n")},
+		{"azimuth 45deg, elevation 1000 deg (positive out of range)", 45, 1000, 45, 180, []byte("W045 180\r\n")},
+		{"azimuth 45deg, elevation 45 deg", 45, 45, 45, 45, []byte("W045 045\r\n")},
 	}
 
 	for _, tc := range tt {
@@ -165,12 +168,14 @@ func TestSetElevation(t *testing.T) {
 		}
 
 		yaesu := Yaesu{
+			azPreset:     45,
+			elPreset:     0,
 			hasElevation: true,
 			sp:           &dp,
 		}
 
 		t.Run(tc.name, func(t *testing.T) {
-			err := yaesu.SetElevation(tc.value)
+			err := yaesu.SetElevation(tc.elValue)
 			if err != nil {
 				t.Fatalf("unable to set elevation to %v; got error: %q", tc.name, err)
 			}
@@ -182,8 +187,11 @@ func TestSetElevation(t *testing.T) {
 					replaceLineBreaks(res),
 					replaceLineBreaks(res))
 			}
-			if yaesu.ElPreset() != tc.expValue {
-				t.Fatalf("expecting elevation preset %v, but got %v", yaesu.ElPreset(), tc.expValue)
+			if yaesu.ElPreset() != tc.expElValue {
+				t.Fatalf("expecting elevation preset %v, but got %v", yaesu.ElPreset(), tc.expElValue)
+			}
+			if yaesu.AzPreset() != tc.expAzValue {
+				t.Fatalf("expecting azimuth preset %v, but got %v", yaesu.AzPreset(), tc.expAzValue)
 			}
 		})
 	}
