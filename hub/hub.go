@@ -74,16 +74,14 @@ func (hub *Hub) AddRotator(r rotator.Rotator) error {
 func (hub *Hub) addRotator(r rotator.Rotator) error {
 	_, ok := hub.rotators[r.Name()]
 	if ok {
-		return fmt.Errorf("rotator names must be unique; %s provided twice", r.Name())
+		return fmt.Errorf("rotator names must be unique; %s exists more than once", r.Name())
 	}
 	hub.rotators[r.Name()] = r
 	ev := Event{
 		Name:        AddRotator,
 		RotatorName: r.Name(),
 	}
-	if err := hub.broadcastToWsClients(ev); err != nil {
-		fmt.Println(err)
-	}
+	hub.broadcast(ev)
 	log.Printf("added rotator (%s)\n", r.Name())
 
 	return nil
@@ -99,9 +97,7 @@ func (hub *Hub) RemoveRotator(r rotator.Rotator) {
 		RotatorName: r.Name(),
 	}
 
-	if err := hub.broadcastToWsClients(ev); err != nil {
-		fmt.Println(err)
-	}
+	hub.broadcast(ev)
 
 	r.Close()
 	delete(hub.rotators, r.Name())
@@ -253,32 +249,31 @@ func (hub *Hub) ListenHTTP(host string, port int, errorCh chan<- struct{}) {
 	}
 }
 
-// Broadcast sends a rotator Status struct to all connected clients
-func (hub *Hub) Broadcast(h rotator.Heading) {
-
-	hub.BroadcastToTCPClients(h)
-
-	ev := Event{
-		Name:    UpdateHeading,
-		Heading: h,
-	}
-	if err := hub.BroadcastToWsClients(ev); err != nil {
-		log.Println(err)
-	}
-}
-
-// BroadcastToTCPClients will send a rotator.Status struct to all connected
-// TCP Clients
-func (hub *Hub) BroadcastToTCPClients(s rotator.Heading) {
-	// Lock needed for writing to the tcp socket
+// Broadcast sends a rotator event to all connected clients
+func (hub *Hub) Broadcast(ev Event) {
 	hub.Lock()
 	defer hub.Unlock()
+	hub.broadcast(ev)
+}
+
+func (hub *Hub) broadcast(ev Event) {
+	hub.broadcastToTCPClients(ev)
+	hub.broadcastToWsClients(ev)
+}
+
+// BroadcastToTCPClients will send a rotator event to all connected TCP Clients
+func (hub *Hub) broadcastToTCPClients(ev Event) {
+
+	// TCP only supports Heading messages
+	if ev.Name != UpdateHeading {
+		return
+	}
 
 	// update the tcp Clients
 	for c := range hub.tcpClients {
 		// EA4TX's ARSVCOM doesn't understand single Azimuth
 		// messages (+0nnn). It always expects +0nnn+0nnn
-		data := fmt.Sprintf("+0%.3d+0%.3d\r\n", s.Azimuth, s.Elevation)
+		data := fmt.Sprintf("+0%.3d+0%.3d\r\n", ev.Heading.Azimuth, ev.Heading.Elevation)
 		if err := c.write(data); err != nil {
 			log.Printf("error writing to client %v: %v\n", c.RemoteAddr(), err)
 			log.Printf("disconnecting client %v\n", c.RemoteAddr())
@@ -302,16 +297,7 @@ const (
 	UpdateHeading RotatorEvent = "heading"
 )
 
-// BroadcastToWsClients will send a rotator.Status struct to all clients
-// connected through a Websocket
-func (hub *Hub) BroadcastToWsClients(event Event) error {
-	hub.Lock()
-	defer hub.Unlock()
-
-	return hub.broadcastToWsClients(event)
-}
-
-func (hub *Hub) broadcastToWsClients(event Event) error {
+func (hub *Hub) broadcastToWsClients(event Event) {
 
 	for c := range hub.wsClients {
 		if err := c.write(event); err != nil {
@@ -321,6 +307,4 @@ func (hub *Hub) broadcastToWsClients(event Event) error {
 			delete(hub.wsClients, c)
 		}
 	}
-
-	return nil
 }
