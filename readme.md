@@ -1,10 +1,10 @@
 # RemoteRotator
 
 ![Build Status](https://github.com/dh1tw/remoteRotator/workflows/Cross%20Platform%20build/badge.svg?branch=master)
-![Go Report Card](https://goreportcard.com/badge/github.com/dh1tw/remoteRotator)
-![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)
-![Coverage Status](https://coveralls.io/repos/github/dh1tw/remoteRotator/badge.svg?branch=master)
-![Downloads](https://img.shields.io/github/downloads/dh1tw/remoteRotator/total.svg?maxAge=1800)
+[![Go Report Card](https://goreportcard.com/badge/github.com/dh1tw/remoteRotator)](https://goreportcard.com/report/github.com/dh1tw/remoteRotator)
+[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://img.shields.io/badge/license-MIT-blue.svg)
+[![Coverage Status](https://coveralls.io/repos/github/dh1tw/remoteRotator/badge.svg?branch=master)](https://coveralls.io/github/dh1tw/remoteRotator?branch=master)
+[![Downloads](https://img.shields.io/github/downloads/dh1tw/remoteRotator/total.svg?maxAge=1800)](https://github.com/dh1tw/remoteRotator/releases)
 
 ![Alt text](https://i.imgur.com/lcHhslZ.png "remoteRotator WebUI")
 
