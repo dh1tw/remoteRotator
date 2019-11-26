@@ -1,10 +1,10 @@
 # RemoteRotator
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/dh1tw/remoteRotator)](https://goreportcard.com/report/github.com/dh1tw/remoteRotator)
-[![Build Status](https://travis-ci.com/dh1tw/remoteRotator.svg?branch=master)](https://travis-ci.com/dh1tw/remoteRotator)
-[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://img.shields.io/badge/license-MIT-blue.svg)
-[![Coverage Status](https://coveralls.io/repos/github/dh1tw/remoteRotator/badge.svg?branch=master)](https://coveralls.io/github/dh1tw/remoteRotator?branch=master)
-[![Downloads](https://img.shields.io/github/downloads/dh1tw/remoteRotator/total.svg?maxAge=1800)](https://github.com/dh1tw/remoteRotator/releases)
+![Build Status](https://github.com/dh1tw/remoteRotator/workflows/Cross%20Platform%20build/badge.svg?branch=master)
+![Go Report Card](https://goreportcard.com/badge/github.com/dh1tw/remoteRotator)
+![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)
+![Coverage Status](https://coveralls.io/repos/github/dh1tw/remoteRotator/badge.svg?branch=master)
+![Downloads](https://img.shields.io/github/downloads/dh1tw/remoteRotator/total.svg?maxAge=1800)
 
 ![Alt text](https://i.imgur.com/lcHhslZ.png "remoteRotator WebUI")
 
@@ -29,7 +29,6 @@ has been reached.
 - HTTP + Websockets
 - TCP
 
-
 ## License
 
 remoteRotator is published under the permissive [MIT license](https://github.com/dh1tw/remoteRotator/blob/master/LICENSE).
@@ -53,11 +52,11 @@ time. There are no runtime dependencies.
 
 remoteRotator provides a series of nested commands and flags.
 
-````bash
+```bash
 $ ./remoteRotator
-````
+```
 
-````
+```text
 Network interface for Rotators
 
 Usage:
@@ -75,7 +74,7 @@ Flags:
   -h, --help            help for remoteRotator
 
 Use "remoteRotator [command] --help" for more information about a command.
-````
+```
 
 So let's fire up a remoteRotator server for your rotator:
 
@@ -86,11 +85,11 @@ a device in the `/dev/` folder (e.g. `/dev/ttyACM0`).
 All parameters can be set either in a config file (see below) or through pflags.
 To get a list of supported flags for the lan server, execute:
 
-```
+```bash
 $ ./remoteRotator server lan --help
 ```
 
-```
+```text
 The local lan server allows you to expose a rotator to a local area network.
 By default, the rotator will only be listening on the loopback adapter. In
 order to make it available and discoverable on the local network, a network
@@ -149,7 +148,7 @@ COM3 an having the web HTTP server listening on your local network, we would cal
 $ remoteRotator.exe server lan -w "0.0.0.0" -P "COM3" -t yaesu
 ```
 
-```
+```text
 no config file found
 2017/12/08 16:50:25 added rotator (myRotator)
 2017/12/08 16:50:25 Listening on 0.0.0.0:7070 for HTTP connections
@@ -164,21 +163,21 @@ builtin TCP server (although disabled by default).
 
 Start remoteRotator:
 
-```` bash
+``` bash
 $ ./remoteRotator -t dummy --tcp-enabled
-````
+```
 
-````
+``` text
 no config file found
 2017/12/08 16:50:25 added rotator (myRotator)
 2017/12/08 16:50:25 listening on 127.0.0.1:7070 for HTTP connections
 2017/12/08 16:50:25 listening on 127.0.0.1:7373 for TCP connections
 2017/12/08 16:50:25 discovery disabled; the HTTP server must listen on an accessible network interface (e.g. 0.0.0.0)
-````
+```
 
 For testing, we connect directly via telnet:
 
-```
+``` text
 $ telnet localhost 7373
 Trying ::1...
 Connected to localhost.
@@ -224,9 +223,9 @@ If you have multiple rotators, you might want to use the dedicated aggregation
 web server. The following example starts the webserver on port 6005 and listens
 on all network interfaces.
 
-````
+``` text
 $ remoteRotator web -w "0.0.0.0" -k 6005
-````
+```
 
 The Webserver automatically discovers the available remoteRotator instances
 in your local network and adds them from the web interface. Technically the
@@ -256,7 +255,7 @@ Priority:
 
 ## Behaviour on Errors
 
-If an error occures from which remoteRotator can not recover, the application
+If an error occurs from which remoteRotator can not recover, the application
 exits. This typically happens when the connection with the rotator has been
 lost or if the rotator is not responding anymore.
 It is recommended to execute remoteRotator as a service under the supervision
@@ -268,19 +267,19 @@ Please use the Github [Issue tracker](https://github.com/dh1tw/remoteRotator/iss
 to report bugs and ask questions! If you would like to contribute to remoteRotator,
 [pull requests](https://help.github.com/articles/creating-a-pull-request/) are
 welcome! However please consider to provide unit tests with the PR to verify
-the proper behaviour.
+the proper behavior.
 
 If you file a bug report, please include always the version of remoteRotator
 you are running:
 
-```` bash
+``` bash
 $ remoteRotator.exe version
-````
+```
 
-````
+``` text
 copyright Tobias Wellnitz, DH1TW, 2017
 remoteRotator Version: 0.1.0, darwin/amd64, BuildDate: 2017-09-04T00:58:00+02:00, Commit: 338ff13
-````
+```
 
 ## Documentation
 
@@ -290,27 +289,27 @@ The auto generated documentation can be found at
 ## How to build
 
 In order to compile remoteRotator from the sources, you need to have
-[Go](https://golang.org) installed and configured.
+[Go >= 1.13](https://golang.org) installed and configured.
 
 This his how to checkout and compile remoteRotator under Linux/MacOS:
 
-```bash
+``` bash
 $ go get -d github.com/dh1tw/remoteRotator
 $ cd $GOPATH/src/github.com/remoteRotator
 $ make install-deps
 $ make generate
+$ make
 ```
 
 ## How to execute the tests
 
-All critial packages have their own set of unit tests. The tests can be
+All critical packages have their own set of unit tests. The tests can be
 executed with the following commands:
 
-```bash
+``` bash
 $ cd $GOPATH/src/github.com/remoteRotator
 $ go test -v -race ./...
-
 ```
 
-The datarace detector might not be available on all platforms / operating
+The data race detector might not be available on all platforms / operating
 systems.
