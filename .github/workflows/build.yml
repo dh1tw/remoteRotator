@@ -57,6 +57,8 @@ jobs:
       name: Prepare build artifact for stashing
       run: |
         mkdir release
+        ls -al
+        chmod +x ./remoteRotator
         mv ./remoteRotator ./release
     -
       # The build artifact can be identified by the trailing sha of the git commit
@@ -111,6 +113,8 @@ jobs:
       name: Prepare build artifact for stashing
       run: |
         mkdir release
+        ls -al
+        chmod +x ./remoteRotator.exe
         mv ./remoteRotator.exe ./release
     -
       # The build artifact can be identified by the trailing sha of the git commit
@@ -154,6 +158,8 @@ jobs:
       name: Prepare build artifact for stashing
       run: |
         mkdir release
+        ls -al
+        chmod +x ./remoteRotator
         mv ./remoteRotator ./release
     -
       # The build artifact can be identified by the trailing sha of the git commit
@@ -304,7 +310,7 @@ jobs:
         VERSION: ${{ steps.get_version.outputs.VERSION }}
       run: |
         mv ./remoteRotator-${{ matrix.GOOS }}-${{ matrix.GOARCH }}-${{ github.sha }}/remoteRotator* .
-        # chmod +x ./remoteRotator
+        chmod +x ./remoteRotator*
         zip -j remoteRotator-$VERSION-${{ matrix.GOOS }}-${{ matrix.GOARCH }}.zip ./remoteRotator*
     -
       # Download the previously uploaded artifact which contains the release URL
