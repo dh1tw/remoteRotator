@@ -57,8 +57,6 @@ jobs:
       name: Prepare build artifact for stashing
       run: |
         mkdir release
-        ls -al
-        chmod +x ./remoteRotator
         mv ./remoteRotator ./release
     -
       # The build artifact can be identified by the trailing sha of the git commit
@@ -113,8 +111,6 @@ jobs:
       name: Prepare build artifact for stashing
       run: |
         mkdir release
-        ls -al
-        chmod +x ./remoteRotator.exe
         mv ./remoteRotator.exe ./release
     -
       # The build artifact can be identified by the trailing sha of the git commit
@@ -158,8 +154,6 @@ jobs:
       name: Prepare build artifact for stashing
       run: |
         mkdir release
-        ls -al
-        chmod +x ./remoteRotator
         mv ./remoteRotator ./release
     -
       # The build artifact can be identified by the trailing sha of the git commit
