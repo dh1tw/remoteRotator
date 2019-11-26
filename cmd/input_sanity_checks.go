@@ -46,6 +46,10 @@ func sanityCheckRotatorInputs() error {
 		if viper.GetInt("rotator.elevation-max") > 180 {
 			return fmt.Errorf("elevation-min must be <= 180")
 		}
+
+		if viper.GetInt("rotator.elevation-min") >= viper.GetInt("rotator.elevation-max") {
+			return fmt.Errorf("elevation-min must be smaller than elevation-max")
+		}
 	}
 
 	return nil
