@@ -92,7 +92,8 @@ func (r *SbProxy) updateHandler(p broker.Event) error {
 	r.elPreset = int(state.ElevationPreset)
 
 	if r.eventHandler != nil {
-		go r.eventHandler(r, r.serialize().Heading)
+		heading := r.serialize().Heading
+		go r.eventHandler(r, heading)
 	}
 
 	return nil

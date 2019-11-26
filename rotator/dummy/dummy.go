@@ -247,7 +247,8 @@ func (r *Dummy) StopAzimuth() error {
 
 	r.azPreset = r.azimuth
 	if r.eventHandler != nil {
-		r.eventHandler(r, r.serialize().Heading)
+		heading := r.serialize().Heading
+		go r.eventHandler(r, heading)
 	}
 
 	return nil
@@ -260,7 +261,8 @@ func (r *Dummy) StopElevation() error {
 
 	r.elPreset = r.elevation
 	if r.eventHandler != nil {
-		r.eventHandler(r, r.serialize().Heading)
+		heading := r.serialize().Heading
+		go r.eventHandler(r, heading)
 	}
 	return nil
 }
@@ -273,7 +275,8 @@ func (r *Dummy) Stop() error {
 	r.elPreset = r.elevation
 	r.azPreset = r.azimuth
 	if r.eventHandler != nil {
-		r.eventHandler(r, r.serialize().Heading)
+		heading := r.serialize().Heading
+		go r.eventHandler(r, heading)
 	}
 
 	return nil
@@ -322,7 +325,8 @@ func (r *Dummy) updateAzimuth() {
 	if r.hasAzimuth {
 		changed := r.calcNewAzHeading()
 		if changed {
-			r.eventHandler(r, r.serialize().Heading)
+			heading := r.serialize().Heading
+			go r.eventHandler(r, heading)
 		}
 	}
 }
@@ -332,7 +336,8 @@ func (r *Dummy) updateElevation() {
 	if r.hasElevation {
 		changed := r.calcNewElHeading()
 		if changed {
-			r.eventHandler(r, r.serialize().Heading)
+			heading := r.serialize().Heading
+			go r.eventHandler(r, heading)
 		}
 	}
 }

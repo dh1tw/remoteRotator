@@ -274,7 +274,8 @@ func (r *Yaesu) parseMsg(msg string) {
 
 		if r.eventHandler != nil && gotNewValue {
 			// cb launched async to avoid deadlock on yaesu.*()
-			go r.eventHandler(r, r.serialize().Heading)
+			heading := r.serialize().Heading
+			go r.eventHandler(r, heading)
 		}
 	}
 }
