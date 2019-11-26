@@ -49,7 +49,7 @@ var AzimuthRotator = {
     computed: {
         // returns if the rotator is turning
         isTurning: function () {
-            if (Math.abs(this.heading - this.preset) >= 3) {
+            if (Math.abs(this.heading - this.preset) >= 5) {
                 return true;
             }
             return false;
