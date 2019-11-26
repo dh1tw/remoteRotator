@@ -58,12 +58,12 @@ var vm = new Vue({
         getRotatorObj: function (rotatorName) {
 
             if (rotatorName in this.rotators) {
-                return
+                return;
             }
 
             this.$http.get("/api/rotator/" + rotatorName).then(response => {
                 this.addRotator(response.body);
-            })
+            });
         },
 
         // add a rotator
@@ -97,6 +97,8 @@ var vm = new Vue({
                         var nextRot = Object.keys(this.azRotators)[0];
                         this.selectedAzRotator = this.azRotators[nextRot];
                     }
+                } else {
+                    this.selectedAzRotator.name = "n/a";
                 }
 
                 // check if other elevation rotators are still available
@@ -106,13 +108,15 @@ var vm = new Vue({
                         var nextRot = Object.keys(this.elRotators)[0];
                         this.selectedElRotator = this.elRotators[nextRot];
                     }
+                } else {
+                    this.selectedElRotator.name = "n/a";
                 }
             }
 
             this.resizeWindow();
         },
 
-        // open the websocket and set an eventlister to receive updates
+        // open the websocket and set an event listener to receive updates
         // for rotators
         openWebsocket: function () {
             var protocol = "ws://";
@@ -122,20 +126,20 @@ var vm = new Vue({
             this.ws = new ReconnectingWebSocket(protocol + window.location.host + '/ws');
             this.ws.addEventListener('message', function (e) {
                 var eventMsg = JSON.parse(e.data);
-                // console.log(eventMsg);
+                console.log(eventMsg);
 
                 // add rotator
-                if (eventMsg['name'] == 'add') {
-                    this.getRotatorObj(eventMsg['rotator_name']);
+                if (eventMsg.name == 'add') {
+                    this.getRotatorObj(eventMsg.rotator_name);
 
                 // remove rotator
-                } else if (eventMsg['name'] == 'remove') {
-                    this.removeRotator(eventMsg['rotator_name']);
+                } else if (eventMsg.name == 'remove') {
+                    this.removeRotator(eventMsg.rotator_name);
 
                 // update heading
-                } else if (eventMsg['name'] == 'heading') {
-                    newHeading = eventMsg['heading']
-                    rotatorName = eventMsg['rotator_name']
+                } else if (eventMsg.name == 'heading') {
+                    var newHeading = eventMsg.heading;
+                    var rotatorName = eventMsg.rotator_name;
                     if (rotatorName in this.rotators) {
                         // copy values
                         this.$set(this.rotators[rotatorName], 'heading', newHeading);
@@ -144,33 +148,35 @@ var vm = new Vue({
             }.bind(this));
 
             this.ws.addEventListener('open', function () {
-                this.connected = true
+                this.connected = true;
                 setTimeout(function () {
                     this.hideConnectionMsg = true;
-                }.bind(this), 1500)
+                }.bind(this), 1500);
             }.bind(this));
 
             this.ws.addEventListener('close', function () {
-                this.connected = false
+                this.connected = false;
                 this.hideConnectionMsg = false;
-                for (rotator in this.rotators) {
+                for (var rotator in this.rotators) {
                     this.removeRotator(this.rotators[rotator]);
                 }
-                this.rotators = {}
+                this.rotators = {};
+                this.selectedAzRotator.name = "n/a";
+                this.selectedElRotator.name = "n/a";
             }.bind(this));
         },
 
         // set the active azimuth rotator
         setAzRotator: function (name) {
             if (name in this.rotators) {
-                this.selectedAzRotator = this.rotators[name]
+                this.selectedAzRotator = this.rotators[name];
             }
         },
 
         // set the active elevation rotator
         setElRotator: function (name) {
             if (name in this.rotators) {
-                this.selectedElRotator = this.rotators[name]
+                this.selectedElRotator = this.rotators[name];
             }
         },
 
