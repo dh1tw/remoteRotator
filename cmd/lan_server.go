@@ -10,12 +10,13 @@ import (
 	"strings"
 	"time"
 
+	// _ "net/http/pprof"
+
 	"github.com/dh1tw/remoteRotator/hub"
 	"github.com/dh1tw/remoteRotator/rotator"
 	"github.com/micro/mdns"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	// _ "net/http/pprof"
 )
 
 var lanServerCmd = &cobra.Command{
@@ -123,10 +124,15 @@ func lanServer(cmd *cobra.Command, args []string) {
 	// 	log.Println(http.ListenAndServe("0.0.0.0:6060", http.DefaultServeMux))
 	// }()
 
-	bcast := make(chan rotator.Heading, 10)
+	bcast := make(chan hub.Event, 10)
 
 	var rEventHandler = func(r rotator.Rotator, heading rotator.Heading) {
-		bcast <- heading
+		e := hub.Event{
+			Name:        hub.UpdateHeading,
+			RotatorName: r.Name(),
+			Heading:     heading,
+		}
+		bcast <- e
 	}
 
 	rotatorError := make(chan struct{})
@@ -191,7 +197,6 @@ func lanServer(cmd *cobra.Command, args []string) {
 			return
 		}
 	}
-
 }
 
 func startMdnsServer(shutdown <-chan struct{}) error {

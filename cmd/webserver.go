@@ -204,7 +204,7 @@ func webServer(cmd *cobra.Command, args []string) {
 				RotatorName: u.rotatorName, //MISSING
 				Heading:     u.heading,
 			}
-			w.BroadcastToWsClients(ev)
+			w.Broadcast(ev)
 		}
 	}
 }
