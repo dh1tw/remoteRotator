@@ -2,7 +2,6 @@ package sbProxy
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/dh1tw/remoteRotator/rotator"
@@ -48,7 +47,7 @@ func New(opts ...func(*SbProxy)) (*SbProxy, error) {
 		opt(r)
 	}
 
-	fmt.Println("serviceName is:", r.serviceName)
+	// fmt.Println("serviceName is:", r.serviceName)
 	r.rcli = sbRotator.NewRotatorClient(r.serviceName, r.cli)
 
 	if err := r.getInfo(); err != nil {
