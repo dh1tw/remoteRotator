@@ -8,10 +8,8 @@
 
 ![Alt text](https://i.imgur.com/lcHhslZ.png "remoteRotator WebUI")
 
-remoteRotator is a cross platform application which makes your azimuth / elevation
-antenna rotators available on the network.
-
-remoteRotator is written in the programing language [Go](https://golang.org).
+remoteRotator is a command line application which makes your azimuth / elevation
+antenna rotators available on the network. It available for Linux/Windows/MacOS and written in the programing language [Go](https://golang.org).
 
 **ADVICE**: This project is **under development**. The parameters and the ICD
 are still **not stable** and subject to change until the first major version
@@ -25,9 +23,8 @@ has been reached.
 
 ## Supported Transportation Protocols
 
-- NATS
-- HTTP + Websockets
-- TCP
+- [NATS](https://nats.io) (preferred)
+- HTTP + Websockets + MDNS
 
 ## License
 
@@ -35,18 +32,20 @@ remoteRotator is published under the permissive [MIT license](https://github.com
 
 ## Download
 
-You can download a tarball / zip archive with the compiled binary for MacOS
-(AMD64), Linux (386/AMD64/ARM) and Windows (386/AMD64) from the
-[releases](https://github.com/dh1tw/remoteRotator/releases) page.
+You can download a tarball / zip archive with the compiled binary for
+
+- MacOS (amd64)
+- Linux (arm,386,amd64)
+- Windows (386,amd64)
+
+ from the [releases](https://github.com/dh1tw/remoteRotator/releases) page.
 
 remoteRotator works well on SoC boards like the Raspberry / Orange / Banana Pis.
-
-remoteRotator is just a single executable.
+The application is a self contained single executable.
 
 ## Dependencies
 
-remoteRotator only depends on a few go libraries which are needed at compile
-time. There are no runtime dependencies.
+remoteRotator does not have any runtime dependencies.
 
 ## Getting started
 
@@ -90,7 +89,7 @@ $ ./remoteRotator server lan --help
 ```
 
 ```text
-The local lan server allows you to expose a rotator to a local area network.
+The lan server allows you to expose a rotator on your local area network.
 By default, the rotator will only be listening on the loopback adapter. In
 order to make it available and discoverable on the local network, a network
 connected adapter has to be selected.
@@ -161,10 +160,11 @@ If you have an application (e.g. [arsvcom](https://ea4tx.com/en/arsvcom/) or
 a Yaesu compatible rotator, you can point that application to remoteRotator's
 builtin TCP server (although disabled by default).
 
-Start remoteRotator:
+Let's start a dummy rotator instance on Linux and enable the build-in TCP
+server:
 
 ``` bash
-$ ./remoteRotator -t dummy --tcp-enabled
+$ ./remoteRotator server lan -t dummy --tcp-enabled
 ```
 
 ``` text
@@ -214,6 +214,8 @@ disappears when the desired direction has been reached.
 The dotted red line indicates the mechanical stop of the rotator.
 A green arc segment indicates a limited turning radius for this rotator.
 A blue arc segment indicates the mechanical overlap supported by this rotator.
+These indicators are just visual helpers and are configurable though command line
+flags or in the config file.
 
 ## Web Interface (Aggregator)
 
@@ -228,8 +230,8 @@ $ remoteRotator web -w "0.0.0.0" -k 6005
 ```
 
 The Webserver automatically discovers the available remoteRotator instances
-in your local network and adds them from the web interface. Technically the
-discovery process is based on mDNS and doesn't require any configuration.
+in your local network and adds them from the web interface. Depending on which transport you have chosen, the discovery process is either done through MDNS (lan)
+or NATS. The discovery functionality doesn't require any configuration.
 
 ## Config file
 
