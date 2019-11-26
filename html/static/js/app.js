@@ -164,7 +164,7 @@ var vm = new Vue({
             this.ws = new ReconnectingWebSocket(protocol + window.location.host + '/ws');
             this.ws.addEventListener('message', function (e) {
                 var eventMsg = JSON.parse(e.data);
-                console.log(eventMsg);
+                // console.log(eventMsg);
 
                 // add rotator
                 if (eventMsg.name == 'add') {
