@@ -13,10 +13,11 @@ var vm = new Vue({
                 el_preset: 0,
             },
             config: {
-                az_stop: 0,
-                az_min: 0,
-                az_max: 360,
-                az_overlap: false,
+                has_azimuth: false,
+                azimuth_stop: 0,
+                azimuth_min: 0,
+                azimuth_max: 360,
+                azimuth_overlap: false,
             }
         },
         selectedElRotator: {
@@ -28,8 +29,9 @@ var vm = new Vue({
                 el_preset: 0,
             },
             config: {
-                el_min: 0,
-                el_max: 180,
+                has_elevation: false,
+                elevation_min: 0,
+                elevation_max: 180,
             }
         },
         canvasSize: 200,
@@ -98,7 +100,7 @@ var vm = new Vue({
                         this.selectedAzRotator = this.azRotators[nextRot];
                     }
                 } else {
-                    this.selectedAzRotator.name = "n/a";
+                    this.clearSelectedAzRotator();
                 }
 
                 // check if other elevation rotators are still available
@@ -109,11 +111,47 @@ var vm = new Vue({
                         this.selectedElRotator = this.elRotators[nextRot];
                     }
                 } else {
-                    this.selectedElRotator.name = "n/a";
+                    this.clearSelectedElRotator();
                 }
             }
 
             this.resizeWindow();
+        },
+
+        clearSelectedAzRotator: function(){
+            this.selectedAzRotator = {
+                name: "n/a",
+                heading: {
+                    azimuth: 0,
+                    az_preset: 0,
+                    elevation: 0,
+                    el_preset: 0,
+                },
+                config: {
+                    has_azimuth: false,
+                    azimuth_stop: 0,
+                    azimuth_min: 0,
+                    azimuth_max: 360,
+                    azimuth_overlap: false,
+                }
+            };
+        },
+
+        clearSelectedElRotator: function(){
+            this.selectedElRotator = {
+                name: "n/a",
+                heading: {
+                    azimuth: 0,
+                    az_preset: 0,
+                    elevation: 0,
+                    el_preset: 0,
+                },
+                config: {
+                    has_elevation: false,
+                    elevation_min: 0,
+                    elevation_max: 180,
+                }
+            };
         },
 
         // open the websocket and set an event listener to receive updates
