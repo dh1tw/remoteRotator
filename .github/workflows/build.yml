@@ -304,7 +304,7 @@ jobs:
         VERSION: ${{ steps.get_version.outputs.VERSION }}
       run: |
         mv ./remoteRotator-${{ matrix.GOOS }}-${{ matrix.GOARCH }}-${{ github.sha }}/remoteRotator* .
-        # chmod +x ./remoteRotator
+        chmod +x ./remoteRotator*
         zip -j remoteRotator-$VERSION-${{ matrix.GOOS }}-${{ matrix.GOARCH }}.zip ./remoteRotator*
     -
       # Download the previously uploaded artifact which contains the release URL
