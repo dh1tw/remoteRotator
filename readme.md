@@ -297,7 +297,7 @@ This his how to checkout and compile remoteRotator under Linux/MacOS:
 
 ``` bash
 $ go get -d github.com/dh1tw/remoteRotator
-$ cd $GOPATH/src/github.com/remoteRotator
+$ cd $GOPATH/src/github.com/dh1tw/remoteRotator
 $ make install-deps
 $ make generate
 $ make
@@ -309,7 +309,7 @@ All critical packages have their own set of unit tests. The tests can be
 executed with the following commands:
 
 ``` bash
-$ cd $GOPATH/src/github.com/remoteRotator
+$ cd $GOPATH/src/github.com/dh1tw/remoteRotator
 $ go test -v -race ./...
 ```
 
