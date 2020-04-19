@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-18.04
     strategy:
       matrix:
-        version: ['linux-arm', 'linux-386', 'linux-amd64']
+        version: ['linux-arm', 'linux-386', 'linux-amd64', 'windows-386', 'windows-amd64']
         include:
         # add the GO environment variables
           - version: linux-arm
@@ -61,65 +61,7 @@ jobs:
       name: Prepare build artifact for stashing
       run: |
         mkdir release
-        mv ./remoteRotator ./release
-    -
-      # The build artifact can be identified by the trailing sha of the git commit
-      name: Stash the build artifact
-      uses: actions/upload-artifact@v1
-      with:
-        name: remoteRotator-${{ matrix.GOOS }}-${{ matrix.GOARCH }}-${{ github.sha }}
-        path: ./release
-
-  build_windows:
-    runs-on: ubuntu-18.04
-    strategy:
-      matrix:
-        version: ['windows-386', 'windows-amd64']
-        include:
-        # add the GO environment variables
-          - version: windows-386
-            GOOS: windows
-            GOARCH: '386'
-          - version: windows-amd64
-            GOOS: windows
-            GOARCH: amd64
-    steps:
-    -
-      name: Set up Go 1.14
-      uses: actions/setup-go@v1
-      id: go
-      with:
-        go-version: 1.14
-    -
-      name: Checkout source code
-      uses: actions/checkout@v1
-      with:
-        submodules: true
-    -
-      name: Install dependencies
-      run: |
-        sudo apt install upx -y
-        make install-deps
-    -
-      name: switch to javascript production libraries
-      run: |
-        make js-production
-    -
-      name: Generate adapter code
-      run: |
-        export PATH=/home/runner/go/bin:$PATH
-        make generate
-    -
-      name: Compile
-      env:
-        GOOS: ${{ matrix.GOOS }}
-        GOARCH: ${{ matrix.GOARCH }}
-      run: make dist
-    -
-      name: Prepare build artifact for stashing
-      run: |
-        mkdir release
-        mv ./remoteRotator.exe ./release
+        mv ./remoteRotator* ./release
     -
       # The build artifact can be identified by the trailing sha of the git commit
       name: Stash the build artifact
@@ -240,7 +182,7 @@ jobs:
   # And the previous build jobs have been successful
   create_release:
     runs-on: ubuntu-18.04
-    needs: [build_linux, build_windows, build_macos, test_linux, test_macos]
+    needs: [build_linux, build_macos, test_linux, test_macos]
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
     -
