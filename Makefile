@@ -17,13 +17,20 @@ build:
 	go build -v -ldflags="-X github.com/dh1tw/remoteRotator/cmd.commitHash=${COMMIT} \
 		-X github.com/dh1tw/remoteRotator/cmd.version=${VERSION}"
 
-# strip off dwraf table - used for travis CI
+# replace the debug version of js libraries with their production, minified versions
+js-production:
+	find html/index.html -exec sed -i '' 's/vue.js/vue.min.js/g' {} \;
+
+# replace the minified versions of js libraries with their full, development versions
+js-development:
+	find html/index.html -exec sed -i '' 's/vue.min.js/vue.js/g' {} \;
 
 generate:
 	go generate ./...
 	cd hub; \
 	rice embed-go
 
+# strip off dwraf table - used for travis CI
 dist:
 	go build -v -ldflags="-w -s -X github.com/dh1tw/remoteRotator/cmd.commitHash=${COMMIT} \
 		-X github.com/dh1tw/remoteRotator/cmd.version=${VERSION}"
@@ -52,4 +59,4 @@ install-deps:
 clean:
 	-@rm remoteRotator remoteRotator-v*
 
-.PHONY: build vet lint clean install-deps generate
+.PHONY: build vet lint clean install-deps generate js-production js-development
