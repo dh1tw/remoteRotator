@@ -82,7 +82,7 @@ func (hub *Hub) addRotator(r rotator.Rotator) error {
 		RotatorName: r.Name(),
 	}
 	hub.broadcast(ev)
-	log.Printf("added rotator (%s)\n", r.Name())
+	log.Printf("added rotator '%s'\n", r.Name())
 
 	return nil
 }
@@ -101,7 +101,7 @@ func (hub *Hub) RemoveRotator(r rotator.Rotator) {
 
 	r.Close()
 	delete(hub.rotators, r.Name())
-	log.Printf("removed rotator (%s)\n", r.Name())
+	log.Printf("removed rotator '%s'\n", r.Name())
 }
 
 // Rotator returns a particular rotator stored from the hub. If no

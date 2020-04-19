@@ -411,6 +411,7 @@ func (w *webserver) checkTimeout() {
 				if !exists {
 					continue
 				}
+				log.Printf("TTL expired '%s'", rotatorName)
 				r.Close()
 				delete(w.cache.cache, service)
 			}
