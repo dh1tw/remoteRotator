@@ -147,18 +147,18 @@ func webServer(cmd *cobra.Command, args []string) {
 	}
 
 	cache := &serviceCache{
-		ttl:   time.Second * 10,
+		ttl:   time.Second * 25,
 		cache: make(map[string]time.Time),
 	}
 	w := webserver{h, cl, cache}
 
-	// will be closed when an error occures in the webserver goroutine
+	// will be closed when an error occurs in the webserver goroutine
 	webserverErrorCh := make(chan struct{})
 
 	// launch webserver
 	go w.ListenHTTP(viper.GetString("web.host"), viper.GetInt("web.port"), webserverErrorCh)
 
-	// watch the registry in a seperate thread for changes
+	// watch the registry in a separate thread for changes
 	if sbTransport == "nats" {
 		// at startup query the registry and add all found rotators
 		if err := w.listAndAddRotators(); err != nil {
@@ -166,7 +166,7 @@ func webServer(cmd *cobra.Command, args []string) {
 		}
 		// from now on watch the registry in a separate go-routine for changes
 		go w.watchRegistry()
-		// check regularily if the proxy objects are still alive
+		// check regularly if the proxy objects are still alive
 		go w.checkTimeout()
 	}
 
@@ -310,7 +310,7 @@ func isRotator(serviceName string) bool {
 	return true
 }
 
-// watchRegistry is a blocking function which continously
+// watchRegistry is a blocking function which continuously
 // checks the registry for changes (new rotators being added/updated/removed).
 func (w *webserver) watchRegistry() {
 	watcher, err := w.cli.Options().Registry.Watch()
