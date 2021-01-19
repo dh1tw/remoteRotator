@@ -17,14 +17,22 @@ has been reached.
 
 ## Supported Rotators
 
+This is a list of rotator controllers which are known to work well with remoteRotator.
+
 - [Yaesu GS232A](http://www.yaesu.com/indexVS.cfm?cmd=DisplayProducts&ProdCatID=104&encProdID=79A89CEC477AA3B819EE02831F3FD5B8)
-- [EA4TX ARS (implements Yaesu GS232A)](http://ea4tx.com/en/)
-- Dummy rotator
+- [K3NG Open Source Rotator Controller (implements Yaesu GS232A)](https://github.com/k3ng/k3ng_rotator_controller)
+- [RemoteQTH Azimuth Rotator Interface (K3NG firmware)](https://remoteqth.com/single-rotator-interface.php)
+- [EA4TX ARS (implements Yaesu GS232A)](https://ea4tx.com/en/)
+- [ERC Easy-Rotator-Control (implements Yaesu GS232A)](https://www.schmidt-alba.de/eshop/)
+- Dummy rotator (great for playing around with remoteRotator)
+
+If your rotator controller is not supported, feel free to open an [issue](https://github.com/dh1tw/remoteRotator/issues).
+It is relatively easy to add more rotator controllers / protocols.
 
 ## Supported Transportation Protocols
 
 - [NATS](https://nats.io) (preferred)
-- HTTP + Websockets + MDNS
+- HTTP + Websockets + MDNS (will be deprecated)
 
 ## License
 
@@ -279,8 +287,8 @@ $ remoteRotator.exe version
 ```
 
 ``` text
-copyright Tobias Wellnitz, DH1TW, 2017
-remoteRotator Version: 0.1.0, darwin/amd64, BuildDate: 2017-09-04T00:58:00+02:00, Commit: 338ff13
+copyright Tobias Wellnitz, DH1TW, 2019
+remoteRotator Version: v0.5.2, linux/amd64, BuildDate: 2021-01-19T02:19:37+01:00, Commit: eb469d6
 ```
 
 ## Documentation
@@ -291,9 +299,18 @@ The auto generated documentation can be found at
 ## How to build
 
 In order to compile remoteRotator from the sources, you need to have
-[Go >= 1.13](https://golang.org) installed and configured.
+[Go >= 1.15](https://golang.org) installed and configured.
 
-This his how to checkout and compile remoteRotator under Linux/MacOS:
+It is assumed that the variables `$GOPATH` is set and that `$GOPATH\bin` is
+added to your `$PATH` environment variable.
+
+Install the dependencies if you haven't already
+
+``` bash
+$ sudo apt-get install git build-essential upx
+```
+
+This his how to download, prepare and compile remoteRotator under Linux/MacOS:
 
 ``` bash
 $ go get -d github.com/dh1tw/remoteRotator
