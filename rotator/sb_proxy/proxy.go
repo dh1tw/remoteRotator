@@ -6,15 +6,15 @@ import (
 
 	"github.com/dh1tw/remoteRotator/rotator"
 	sbRotator "github.com/dh1tw/remoteRotator/sb_rotator"
-	"github.com/gogo/protobuf/proto"
-	"github.com/micro/go-micro/broker"
-	"github.com/micro/go-micro/client"
+	"github.com/micro/go-micro/v2/broker"
+	"github.com/micro/go-micro/v2/client"
+	"google.golang.org/protobuf/proto"
 )
 
 type SbProxy struct {
 	sync.RWMutex
 	cli            client.Client
-	rcli           sbRotator.RotatorClient
+	rcli           sbRotator.RotatorService
 	eventHandler   func(rotator.Rotator, rotator.Heading)
 	name           string
 	azimuthMin     int
@@ -48,7 +48,7 @@ func New(opts ...func(*SbProxy)) (*SbProxy, error) {
 	}
 
 	// fmt.Println("serviceName is:", r.serviceName)
-	r.rcli = sbRotator.NewRotatorClient(r.serviceName, r.cli)
+	r.rcli = sbRotator.NewRotatorService(r.serviceName, r.cli)
 
 	if err := r.getInfo(); err != nil {
 		return nil, err

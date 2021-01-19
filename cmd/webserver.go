@@ -9,14 +9,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/micro/go-micro/broker"
-	"github.com/micro/go-micro/client"
-	"github.com/micro/go-micro/client/selector/static"
-	"github.com/micro/go-micro/registry"
-	"github.com/micro/go-micro/transport"
-	natsBroker "github.com/micro/go-plugins/broker/nats"
-	natsReg "github.com/micro/go-plugins/registry/nats"
-	natsTr "github.com/micro/go-plugins/transport/nats"
+	natsBroker "github.com/micro/go-micro/plugins/broker/nats/v2"
+	natsReg "github.com/micro/go-micro/plugins/registry/nats/v2"
+	natsTr "github.com/micro/go-micro/plugins/transport/nats/v2"
+	"github.com/micro/go-micro/v2/broker"
+	"github.com/micro/go-micro/v2/client"
+	"github.com/micro/go-micro/v2/registry"
+	"github.com/micro/go-micro/v2/transport"
 	nats "github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -137,7 +136,8 @@ func webServer(cmd *cobra.Command, args []string) {
 			client.Registry(reg),
 			client.PoolSize(1),
 			client.PoolTTL(time.Hour*8760), // one year - don't TTL our connection
-			client.Selector(static.NewSelector()),
+			// client.Selector(static.NewSelector()),
+			// client.Selector(static.NewSelector()),
 		)
 
 		if err := cl.Init(); err != nil {
