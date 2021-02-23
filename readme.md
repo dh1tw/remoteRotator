@@ -11,10 +11,11 @@
 remoteRotator is a command line application which makes your azimuth / elevation
 antenna rotators available on the network. It available for Linux/Windows/MacOS and written in the programing language [Go](https://golang.org).
 
+To get a first impression, you're welcome to play with our public demo at [demo.rotator.shackbus.org](https://demo.rotator.shackbus.org).
+
 **ADVICE**: This project is **under development**. The parameters and the ICD
 are still **not stable** and subject to change until the first major version
 has been reached.
-
 ## Supported Rotators
 
 This is a list of rotator controllers which are known to work well with remoteRotator.
@@ -28,13 +29,12 @@ This is a list of rotator controllers which are known to work well with remoteRo
 
 If your rotator controller is not supported, feel free to open an [issue](https://github.com/dh1tw/remoteRotator/issues).
 It is relatively easy to add more rotator controllers / protocols.
-
 ## Supported Transportation Protocols
 
 - [NATS](https://nats.io) (preferred)
 - HTTP + Websockets + MDNS (will be deprecated)
 
-## License
+# License
 
 remoteRotator is published under the permissive [MIT license](https://github.com/dh1tw/remoteRotator/blob/master/LICENSE).
 
