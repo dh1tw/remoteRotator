@@ -6,7 +6,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/dh1tw/remoteRotator/badge.svg?branch=master)](https://coveralls.io/github/dh1tw/remoteRotator?branch=master)
 [![Downloads](https://img.shields.io/github/downloads/dh1tw/remoteRotator/total.svg?maxAge=1800)](https://github.com/dh1tw/remoteRotator/releases)
 
-![Alt text](https://i.imgur.com/lcHhslZ.png "remoteRotator WebUI")
+[![Alt text](https://i.imgur.com/lcHhslZ.png "remoteRotator WebUI")](https://demo.rotator.shackbus.org)
 
 remoteRotator is a command line application which makes your azimuth / elevation
 antenna rotators available on the network. It available for Linux/Windows/MacOS and written in the programing language [Go](https://golang.org).
