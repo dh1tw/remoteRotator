@@ -1,8 +1,8 @@
 package sbProxy
 
 import (
+	"github.com/asim/go-micro/v3/client"
 	"github.com/dh1tw/remoteRotator/rotator"
-	"github.com/micro/go-micro/v2/client"
 )
 
 func Client(cli client.Client) func(*SbProxy) {

@@ -9,13 +9,13 @@ import (
 	"sync"
 	"time"
 
-	natsBroker "github.com/micro/go-micro/plugins/broker/nats/v2"
-	natsReg "github.com/micro/go-micro/plugins/registry/nats/v2"
-	natsTr "github.com/micro/go-micro/plugins/transport/nats/v2"
-	"github.com/micro/go-micro/v2/broker"
-	"github.com/micro/go-micro/v2/client"
-	"github.com/micro/go-micro/v2/registry"
-	"github.com/micro/go-micro/v2/transport"
+	natsBroker "github.com/asim/go-micro/plugins/broker/nats/v3"
+	natsReg "github.com/asim/go-micro/plugins/registry/nats/v3"
+	natsTr "github.com/asim/go-micro/plugins/transport/nats/v3"
+	"github.com/asim/go-micro/v3/broker"
+	"github.com/asim/go-micro/v3/client"
+	"github.com/asim/go-micro/v3/registry"
+	"github.com/asim/go-micro/v3/transport"
 	nats "github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -136,6 +136,7 @@ func webServer(cmd *cobra.Command, args []string) {
 			client.Registry(reg),
 			client.PoolSize(1),
 			client.PoolTTL(time.Hour*8760), // one year - don't TTL our connection
+			client.ContentType("application/proto-rpc"),
 		)
 
 		if err := cl.Init(); err != nil {

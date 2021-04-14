@@ -4,10 +4,10 @@ import (
 	"context"
 	"sync"
 
+	"github.com/asim/go-micro/v3/broker"
+	"github.com/asim/go-micro/v3/client"
 	"github.com/dh1tw/remoteRotator/rotator"
 	sbRotator "github.com/dh1tw/remoteRotator/sb_rotator"
-	"github.com/micro/go-micro/v2/broker"
-	"github.com/micro/go-micro/v2/client"
 	"google.golang.org/protobuf/proto"
 )
 
