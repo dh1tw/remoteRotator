@@ -2,7 +2,7 @@ syntax ="proto3";
 
 package shackbus;
 
-option go_package = "sb_rotator/.";
+option go_package = "./sb_rotator";
 
 service Rotator{
     rpc SetAzimuth(HeadingReq) returns (None);
