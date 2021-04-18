@@ -72,6 +72,7 @@ jobs:
 
   build_macos:
     runs-on: macos-latest
+    # runs-on: macos-11.0
     strategy:
       matrix:
         version: ['macos-amd64', 'macos-arm64']
@@ -113,7 +114,10 @@ jobs:
       env:
         GOOS: ${{ matrix.GOOS }}
         GOARCH: ${{ matrix.GOARCH }}
-      run: make dist
+        CGO_ENABLED: 1
+      run: |
+        SDKROOT=$(xcrun --sdk macosx --show-sdk-path) \
+        make dist
     -
       name: Prepare build artifact for stashing
       run: |
@@ -163,6 +167,7 @@ jobs:
 
   test_macos:
     runs-on: macos-latest
+    # runs-on: macos-11.0
     steps:
     -
       name: Set up Go 1.16

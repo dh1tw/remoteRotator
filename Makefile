@@ -35,7 +35,17 @@ dist:
 	go build -v -ldflags="-w -s -X github.com/dh1tw/remoteRotator/cmd.commitHash=${COMMIT} \
 		-X github.com/dh1tw/remoteRotator/cmd.version=${VERSION}"
 	# compress binary
-	if [ "${GOOS}" == "windows" ]; then upx remoteRotator.exe; else upx remoteRotator; fi
+	# there is a know issue that upx currently doesn't work with darwin/arm64.
+	# See https://github.com/upx/upx/issues/424
+	# until it's resolved, we ship darwin/arm64 uncompressed.
+	if [ "${GOOS}" == "windows" ]; \
+		then upx remoteRotator.exe; \
+		else \
+		if [ "${GOOS}" == "darwin" ] && [ "${GOARCH}" == "arm64" ]; \
+			then true; \
+		else upx remoteRotator; \
+		fi \
+	fi
 
 # test:
 # 	@go test -short ${PKG_LIST}
