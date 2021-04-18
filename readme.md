@@ -283,23 +283,23 @@ If you file a bug report, please include always the version of remoteRotator
 you are running:
 
 ``` bash
-$ remoteRotator.exe version
+$ ./remoteRotator version
 ```
 
 ``` text
-copyright Tobias Wellnitz, DH1TW, 2019
-remoteRotator Version: v0.5.2, linux/amd64, BuildDate: 2021-01-19T02:19:37+01:00, Commit: eb469d6
+copyright Tobias Wellnitz, DH1TW, 2020
+remoteRotator Version: v0.6.0, darwin/arm64, BuildDate: 2021-04-18T03:35:42+02:00, Commit: 00fe466
 ```
 
 ## Documentation
 
 The auto generated documentation can be found at
-[godoc.org](https://godoc.org/github.com/dh1tw/remoteRotator).
+[pkg.go.dev](https://pkg.go.dev/github.com/dh1tw/remoteRotator).
 
 ## How to build
 
 In order to compile remoteRotator from the sources, you need to have
-[Go >= 1.15](https://golang.org) installed and configured.
+[Go >= 1.16](https://golang.org) installed and configured.
 
 It is assumed that the variables `$GOPATH` is set and that `$GOPATH\bin` is
 added to your `$PATH` environment variable.
@@ -313,8 +313,10 @@ $ sudo apt-get install git build-essential upx
 This his how to download, prepare and compile remoteRotator under Linux/MacOS:
 
 ``` bash
-$ go get -d github.com/dh1tw/remoteRotator
-$ cd $GOPATH/src/github.com/dh1tw/remoteRotator
+$ mkdir -p $GOPATH/src/github.com/dh1tw && cd "$_"
+$ git clone https://github.com/dh1tw/remoteRotator.git
+$ cd remoteRotator
+$ go get ./...
 $ make install-deps
 $ make generate
 $ make
