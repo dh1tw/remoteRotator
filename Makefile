@@ -10,6 +10,9 @@ VERSION := $(shell git describe --tags)
 PKG_LIST := $(shell go list ${PKG}/... | grep -v /vendor/)
 GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/)
 
+GOOS := $(shell go env GOOS)
+GOARCH := $(shell go env GOARCH)
+
 all: build
 
 build:
@@ -19,16 +22,14 @@ build:
 
 # replace the debug version of js libraries with their production, minified versions
 js-production:
-	find html/index.html -exec sed -i '' 's/vue.js/vue.min.js/g' {} \;
+	find hub/html/index.html -exec sed -i '' 's/vue.js/vue.min.js/g' {} \;
 
 # replace the minified versions of js libraries with their full, development versions
 js-development:
-	find html/index.html -exec sed -i '' 's/vue.min.js/vue.js/g' {} \;
+	find hub/html/index.html -exec sed -i '' 's/vue.min.js/vue.js/g' {} \;
 
 generate:
 	go generate ./...
-	cd hub; \
-	rice embed-go
 
 # strip off dwraf table - used for travis CI
 dist:

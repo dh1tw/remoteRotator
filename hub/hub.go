@@ -1,18 +1,22 @@
 package hub
 
 import (
+	"embed"
 	"fmt"
+	"io/fs"
 	"log"
 	"net"
 	"net/http"
 	"regexp"
 	"sync"
 
-	rice "github.com/GeertJohan/go.rice"
-
+	nfs "github.com/dh1tw/nolistfs"
 	"github.com/dh1tw/remoteRotator/rotator"
 	"github.com/gorilla/mux"
 )
+
+//go:embed html
+var htmlDirectory embed.FS
 
 // Hub is a struct which makes a rotator available through network
 // interfaces, supporting several protocols.
@@ -232,8 +236,16 @@ func (hub *Hub) ListenHTTP(host string, port int, errorCh chan<- struct{}) {
 
 	defer close(errorCh)
 
-	box := rice.MustFindBox("../html")
-	hub.fileServer = http.FileServer(box.HTTPBox())
+	webAssets, err := fs.Sub(htmlDirectory, "html")
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	webAssetsFS := nfs.New(http.FS(webAssets))
+
+	hub.fileServer = http.FileServer(webAssetsFS)
+
 	hub.router = mux.NewRouter().StrictSlash(true)
 
 	// load the HTTP routes with their respective endpoints
@@ -242,7 +254,7 @@ func (hub *Hub) ListenHTTP(host string, port int, errorCh chan<- struct{}) {
 	// Listen for incoming connections.
 	log.Printf("listening on %s:%d for HTTP connections\n", host, port)
 
-	err := http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), hub.apiRedirectRouter(hub.router))
+	err = http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), hub.apiRedirectRouter(hub.router))
 	if err != nil {
 		log.Println(err)
 		return
