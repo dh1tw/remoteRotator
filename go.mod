@@ -7,7 +7,7 @@ require (
 	github.com/asim/go-micro/plugins/broker/nats/v3 v3.0.0-20210416163442-a91d1f7a3dbb
 	github.com/asim/go-micro/plugins/registry/nats/v3 v3.0.0-20210416163442-a91d1f7a3dbb
 	github.com/asim/go-micro/plugins/transport/nats/v3 v3.0.0-20210416163442-a91d1f7a3dbb
-	github.com/asim/go-micro/v3 v3.5.1
+	github.com/asim/go-micro/v3 v3.5.2-0.20210425055400-b11a2f17e92c
 	github.com/dh1tw/nolistfs v0.1.0
 	github.com/golang/protobuf v1.5.2
 	github.com/gorilla/mux v1.8.0
