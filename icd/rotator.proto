@@ -1,6 +1,6 @@
 syntax ="proto3";
 
-package shackbus;
+package shackbus.rotator;
 
 option go_package = "./sb_rotator";
 
