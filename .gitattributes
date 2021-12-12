@@ -1,1 +1,4 @@
-html/* linguist-vendored
+hub/html/static/** linguist-vendored
+hub/html/static/js/app.js linguist-vendored=false
+hub/html/static/js/components/* linguist-vendored=false
+hub/html/static/css/style.css linguist-vendored=false
