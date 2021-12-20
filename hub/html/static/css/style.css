@@ -87,6 +87,7 @@ body {
     margin: auto;
     padding-left: 10px;
     padding-right: 10px;
+    touch-action: none;
 }
 
 .mini-rotators ul {

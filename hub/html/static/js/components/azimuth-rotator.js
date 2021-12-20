@@ -32,6 +32,7 @@ var AzimuthRotator = {
             ctx: null,
             internalPreset: 0, // internal Preset
             mouseDown: false,
+            touchOngoing: false,
             canvasOptions: {
                 scale: this.canvasSize / 100,
                 color: "#FFF",
@@ -64,12 +65,18 @@ var AzimuthRotator = {
         this.canvas.addEventListener("mousedown", this.mouseDownHandler);
         this.canvas.addEventListener("mousemove", this.mouseMoveHandler);
         this.canvas.addEventListener("mouseout", this.mouseOutHandler);
+        this.canvas.addEventListener("touchstart", this.touchStartHandler, false);
+        this.canvas.addEventListener("touchmove", this.touchMoveHandler, false);
+        this.canvas.addEventListener("touchend", this.touchEndHandler, false);
     },
     beforeDestroy: function () {
         this.canvas.removeEventListener("mousemove", this.mouseClickHandler);
         this.canvas.removeEventListener("mouseup", this.mouseUpHandler);
         this.canvas.removeEventListener("mousedown", this.mouseDownHandler);
         this.canvas.removeEventListener("mouseout", this.mouseOutHandler);
+        this.canvas.removeEventListener("touchstart", this.touchStartHandler);
+        this.canvas.removeEventListener("touchmove", this.touchMoveHandler);
+        this.canvas.removeEventListener("touchend", this.touchEndHandler);
     },
     methods: {
 
@@ -127,7 +134,7 @@ var AzimuthRotator = {
                 return
             }
 
-            var angle = this.getMousePosAngle(this.canvas, evt);
+            var angle = this.getCursorPosAngle(this.canvas, evt);
             var partially = false;
 
             // determin if the rotator covers >= 360°
@@ -167,22 +174,72 @@ var AzimuthRotator = {
 
         mouseUpHandler: function (evt) {
             this.mouseDown = false;
-            var angle = this.getMousePosAngle(this.canvas, evt);
-            this.$emit('set-azimuth', this.name, Math.round(angle, 0));
+            this.$emit('set-azimuth', this.name, Math.round(this.internalPreset, 0));
         },
+        touchStartHandler: function(evt) {
+            this.touchOngoing = true;
+        },
+        touchMoveHandler: function(evt) {
+            var angle = this.getCursorPosAngle(this.canvas, evt);
+            var partially = false;
 
-        getMousePosition: function (canvas, evt) {
+            // determin if the rotator covers >= 360°
+            if (this.max > this.min) {
+                this.max - this.min < 360 ? partially = true : partially = false;
+            } else if (this.max < this.min) { // overlapping 0°
+                var left = 360 - this.min;
+                this.left + this.max < 360 ? partially = true : partially = false;
+            }
+
+            // // supports only < 360°
+            if (partially) {
+
+                // max does not overlap 0°
+                if (this.max > this.min) {
+                    if (angle < this.min) { // preset is < min (outside of valid range)
+                        this.internalPreset = this.min;
+                    } else if (angle > this.max) { // preset is > max (outside of valid range)
+                        this.internalPreset = this.max;
+                    } else { // within valid range
+                        this.internalPreset = angle;
+                    }
+                } else { // max overlapping 0°
+                    if ((angle > this.max) && (angle < this.min)) {
+                        this.internalPreset = this.max;
+                    } else { // within valid range
+                        this.internalPreset = angle;
+                    }
+                }
+
+            } else {
+                this.internalPreset = angle;
+            }
+
+            this.drawRotator(this.heading, this.internalPreset);
+        },
+        touchEndHandler: function(evt) {
+            this.touchOngoing = false;
+            this.$emit('set-azimuth', this.name, Math.round(this.internalPreset, 0));            
+        },
+        getCursorPosition: function(canvas, evt){
             var rect = canvas.getBoundingClientRect();
-            return {
-                x: evt.clientX - rect.left,
-                y: evt.clientY - rect.top
-            };
+            if ("touches" in evt){ // only touch events have the property 'touches'
+                return {
+                    x: evt.touches[0].clientX - rect.left,
+                    y: evt.touches[0].clientY - rect.top
+                }
+            } 
+            
+            return { // must be a mouse event
+                    x: evt.clientX - rect.left,
+                    y: evt.clientY - rect.top
+            }
         },
 
-        getMousePosAngle: function (canvas, evt) {
-            var mousePos = this.getMousePosition(this.canvas, evt);
-            var dx = mousePos.x - this.canvas.width / 2;
-            var dy = mousePos.y - this.canvas.height / 2;
+        getCursorPosAngle: function (canvas, evt) {
+            var cursorPos = this.getCursorPosition(this.canvas, evt);
+            var dx = cursorPos.x - this.canvas.width / 2;
+            var dy = cursorPos.y - this.canvas.height / 2;
             var angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
 
             if (angle < 0) {
@@ -209,7 +266,7 @@ var AzimuthRotator = {
 
             this.drawHeadingNeedle(heading);
 
-            if (this.isTurning || this.mouseDown) {
+            if (this.isTurning || this.mouseDown || this.touchOngoing) {
                 this.drawPreset(preset, this.internalPresetOptions);
             }
         },

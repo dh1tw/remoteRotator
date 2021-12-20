@@ -25,6 +25,7 @@ var ElevationRotator = {
             ctx: null,
             internalPreset: 0, // internal Preset
             mouseDown: false,
+            touchOngoing: false,
             canvasOptions: {
                 scale: this.canvasSize / 100,
                 color: "#FFF",
@@ -57,12 +58,18 @@ var ElevationRotator = {
         this.canvas.addEventListener("mousedown", this.mouseDownHandler);
         this.canvas.addEventListener("mousemove", this.mouseMoveHandler);
         this.canvas.addEventListener("mouseout", this.mouseOutHandler);
+        this.canvas.addEventListener("touchstart", this.touchStartHandler, false);
+        this.canvas.addEventListener("touchmove", this.touchMoveHandler, false);
+        this.canvas.addEventListener("touchend", this.touchEndHandler, false);
     },
     beforeDestroy: function () {
         this.canvas.removeEventListener("mousemove", this.mouseClickHandler);
         this.canvas.removeEventListener("mouseup", this.mouseUpHandler);
         this.canvas.removeEventListener("mousedown", this.mouseDownHandler);
         this.canvas.removeEventListener("mouseout", this.mouseOutHandler);
+        this.canvas.removeEventListener("touchstart", this.touchStartHandler);
+        this.canvas.removeEventListener("touchmove", this.touchMoveHandler);
+        this.canvas.removeEventListener("touchend", this.touchEndHandler);
     },
     methods: {
 
@@ -104,58 +111,82 @@ var ElevationRotator = {
                 return
             }
 
-            var p = this.getMousePosAngle(this.canvas, evt);
+            var p = this.getCursorPosAngle(this.canvas, evt);
 
-            // only values between 0 ... 180 are allowed
-            if (p > 180 && p <= 270) {
-                p = 180;
+            // only values between min and max are allowed
+            if (p > this.max && p <= 270) {
+                p = this.max;
             } else if (p > 270) {
-                p = 0;
-            } else if (p < 0) {
-                p = 0;
+                p = this.min;
+            } else if (p < this.min) {
+                p = this.min;
             }
-
+            
             // no need to redraw
             if (p === this.internalPreset) {
                 return
             }
-
+            
             this.internalPreset = p;
-
+           
             this.drawRotator(this.heading, this.internalPreset);
         },
-
+        
         mouseUpHandler: function (evt) {
             this.mouseDown = false;
-
-            var p = this.getMousePosAngle(this.canvas, evt);
-
-            // only values between 0 ... 180 are allowed
-            if (p > 180 && p <= 270) {
-                p = 180;
-            } else if (p > 270) {
-                p = 0;
-            } else if (p < 0) {
-                p = 0;
-            }
-
-            this.internalPreset = p;
-
             this.$emit('set-elevation', this.name, Math.round(this.internalPreset, 0));
         },
 
-        getMousePosition: function (canvas, evt) {
-            var rect = canvas.getBoundingClientRect();
-            return {
-                x: evt.clientX - rect.left,
-                y: evt.clientY - rect.top
-            };
+        touchStartHandler: function(evt) {
+            this.touchOngoing = true;
+        },
+        touchMoveHandler: function(evt) {
+            // only proceed when the left button is pressed
+            
+            var p = this.getCursorPosAngle(this.canvas, evt);
+
+            // only values between min and max are allowed
+            if (p > this.max && p <= 270) {
+                p = this.max;
+            } else if (p > 270) {
+                p = this.min;
+            } else if (p < this.min) {
+                p = this.min;
+            }
+            
+            // no need to redraw
+            if (p === this.internalPreset) {
+                return
+            }
+            
+            this.internalPreset = p;
+            
+            this.drawRotator(this.heading, this.internalPreset);
+        },
+        touchEndHandler: function(evt) {
+            this.touchOngoing = false;
+            this.$emit('set-elevation', this.name, Math.round(this.internalPreset, 0));
         },
 
-        getMousePosAngle: function (canvas, evt) {
-            var mousePos = this.getMousePosition(this.canvas, evt);
-            var dx = mousePos.x - this.canvas.width / 2;
-            var dy = mousePos.y - this.canvas.height / 2;
+        getCursorPosition: function(canvas, evt){
+            var rect = canvas.getBoundingClientRect();
+            if ("touches" in evt){ // only touch events have the property 'touches'
+                return {
+                    x: evt.touches[0].clientX - rect.left,
+                    y: evt.touches[0].clientY - rect.top
+                }
+            } 
+            
+            return { // must be a mouse event
+                    x: evt.clientX - rect.left,
+                    y: evt.clientY - rect.top
+            }
+        },
+
+        getCursorPosAngle: function (canvas, evt) {
+            var cursorPos = this.getCursorPosition(this.canvas, evt);
+            var dx = cursorPos.x - this.canvas.width / 2;
+            var dy = cursorPos.y - this.canvas.height / 2;
             var angle = Math.atan2(dy, dx) * (180 / Math.PI) + 180;
 
             return angle;
@@ -175,10 +206,15 @@ var ElevationRotator = {
             this.drawCompass();
 
             this.drawHeadingNeedle(heading);
-
-            if (this.isTurning || this.mouseDown) {
+            
+            if ((Math.round(preset) == heading) && !this.isTurning){
+                return
+            }
+            
+            if (this.isTurning || this.mouseDown || this.touchOngoing ) {
                 this.drawPreset(preset, this.internalPresetOptions);
             }
+
         },
 
         // draw the base a compass ring with 45° ticks
