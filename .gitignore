@@ -3,5 +3,5 @@ remoteRotator
 *.zip
 *.tar.gz
 *.tgz
-hub/rice-box.go
 .DS_Store
+*.cov

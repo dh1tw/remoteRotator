@@ -27,11 +27,11 @@ jobs:
             GOARCH: amd64
     steps:
     -
-      name: Set up Go 1.16
+      name: Set up Go 1.17
       uses: actions/setup-go@v1
       id: go
       with:
-        go-version: 1.16
+        go-version: 1.17
     -
       name: Checkout source code
       uses: actions/checkout@v1
@@ -85,11 +85,11 @@ jobs:
             GOARCH: arm64
     steps:
     -
-      name: Set up Go 1.16
+      name: Set up Go 1.17
       uses: actions/setup-go@v1
       id: go
       with:
-        go-version: 1.16
+        go-version: 1.17
     -
       name: Checkout source code
       uses: actions/checkout@v1
@@ -135,11 +135,11 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     -
-      name: Set up Go 1.16
+      name: Set up Go 1.17
       uses: actions/setup-go@v1
       id: go
       with:
-        go-version: 1.16
+        go-version: 1.17
     -
       name: Checkout source code
       uses: actions/checkout@v1
@@ -170,11 +170,11 @@ jobs:
     # runs-on: macos-11.0
     steps:
     -
-      name: Set up Go 1.16
+      name: Set up Go 1.17
       uses: actions/setup-go@v1
       id: go
       with:
-        go-version: 1.16
+        go-version: 1.17
     -
       name: Checkout source code
       uses: actions/checkout@v1
