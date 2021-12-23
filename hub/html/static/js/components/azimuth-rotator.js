@@ -79,7 +79,6 @@ var AzimuthRotator = {
         this.canvas.removeEventListener("touchend", this.touchEndHandler);
     },
     methods: {
-
         // calculates the overlap (>360) of the rotator
         calcOverlap: function () {
 
@@ -93,7 +92,6 @@ var AzimuthRotator = {
 
             return 0;
         },
-
         // calculate the width of the heading needle (depends on the canvas size)
         headingNeedleWidth: function () {
             if (this.canvasSize > 100) {
@@ -101,7 +99,6 @@ var AzimuthRotator = {
             }
             return 7
         },
-
         // calculate the width of the preset needle (depends on the canvas size)
         presetNeedleWidth: function () {
             if (this.canvasSize > 100) {
@@ -109,77 +106,43 @@ var AzimuthRotator = {
             }
             return 3
         },
-
         // calculate the font size (depends on the canvas size)
         headingFont: function () {
             return "normal " + this.canvasSize / 15 + "pt Inconsolata";
         },
-
         mouseDownHandler: function (evt) {
             this.mouseDown = true;
         },
-
         mouseOutHandler: function (evt) {
+            // if the cursor moves out of the canvas, then
+            // ignore the preset
             this.mouseDown = false;
             this.internalPreset = this.preset;
             this.drawRotator(this.heading, this.internalPreset);
         },
-
         mouseMoveHandler: function (evt) {
-
             // only proceed when the left button is pressed
-            // this feature is not supported by the Webkit (Safari) API!
-            // see: https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/buttons
             if (evt.buttons !== 1) {
                 return
             }
-
-            var angle = this.getCursorPosAngle(this.canvas, evt);
-            var partially = false;
-
-            // determin if the rotator covers >= 360°
-            if (this.max > this.min) {
-                this.max - this.min < 360 ? partially = true : partially = false;
-            } else if (this.max < this.min) { // overlapping 0°
-                var left = 360 - this.min;
-                this.left + this.max < 360 ? partially = true : partially = false;
-            }
-
-            // // supports only < 360°
-            if (partially) {
-
-                // max does not overlap 0°
-                if (this.max > this.min) {
-                    if (angle < this.min) { // preset is < min (outside of valid range)
-                        this.internalPreset = this.min;
-                    } else if (angle > this.max) { // preset is > max (outside of valid range)
-                        this.internalPreset = this.max;
-                    } else { // within valid range
-                        this.internalPreset = angle;
-                    }
-                } else { // max overlapping 0°
-                    if ((angle > this.max) && (angle < this.min)) {
-                        this.internalPreset = this.max;
-                    } else { // within valid range
-                        this.internalPreset = angle;
-                    }
-                }
-
-            } else {
-                this.internalPreset = angle;
-            }
-
-            this.drawRotator(this.heading, this.internalPreset);
+            this.calculatePreset(evt);
         },
-
         mouseUpHandler: function (evt) {
             this.mouseDown = false;
+            this.calculatePreset(evt);
             this.$emit('set-azimuth', this.name, Math.round(this.internalPreset, 0));
         },
-        touchStartHandler: function(evt) {
+        touchStartHandler: function (evt) {
             this.touchOngoing = true;
         },
-        touchMoveHandler: function(evt) {
+        touchMoveHandler: function (evt) {
+            this.calculatePreset(evt);
+        },
+        touchEndHandler: function (evt) {
+            this.touchOngoing = false;
+            this.$emit('set-azimuth', this.name, Math.round(this.internalPreset, 0));
+        },
+        calculatePreset: function (evt) {
             var angle = this.getCursorPosAngle(this.canvas, evt);
             var partially = false;
 
@@ -217,25 +180,20 @@ var AzimuthRotator = {
 
             this.drawRotator(this.heading, this.internalPreset);
         },
-        touchEndHandler: function(evt) {
-            this.touchOngoing = false;
-            this.$emit('set-azimuth', this.name, Math.round(this.internalPreset, 0));            
-        },
-        getCursorPosition: function(canvas, evt){
+        getCursorPosition: function (canvas, evt) {
             var rect = canvas.getBoundingClientRect();
-            if ("touches" in evt){ // only touch events have the property 'touches'
+            if ("touches" in evt) { // only touch events have the property 'touches'
                 return {
                     x: evt.touches[0].clientX - rect.left,
                     y: evt.touches[0].clientY - rect.top
                 }
-            } 
-            
+            }
+
             return { // must be a mouse event
-                    x: evt.clientX - rect.left,
-                    y: evt.clientY - rect.top
+                x: evt.clientX - rect.left,
+                y: evt.clientY - rect.top
             }
         },
-
         getCursorPosAngle: function (canvas, evt) {
             var cursorPos = this.getCursorPosition(this.canvas, evt);
             var dx = cursorPos.x - this.canvas.width / 2;
@@ -247,7 +205,6 @@ var AzimuthRotator = {
             }
             return angle;
         },
-
         // draw the heading and preset
         // heading (Number)
         // preset (Number)
@@ -270,9 +227,8 @@ var AzimuthRotator = {
                 this.drawPreset(preset, this.internalPresetOptions);
             }
         },
-
         drawCompass() {
-        // draw the base a compass ring with 45° ticks
+            // draw the base a compass ring with 45° ticks
 
             var cx = 100 * this.canvasOptions.scale; //canvas x size
             var cy = 100 * this.canvasOptions.scale; //canvas y size
@@ -347,7 +303,6 @@ var AzimuthRotator = {
                 this.ctx.fillText("E", cx - 22 * this.canvasOptions.scale, (cy / 2) + this.ctx.measureText(txt).width / 2);
             }
         },
-
         drawHeadingNeedle: function (heading) {
 
             var scale = this.canvasOptions.scale;
@@ -401,7 +356,6 @@ var AzimuthRotator = {
             this.ctx.fill();
             this.ctx.closePath();
         },
-
         drawPreset: function (degrees) {
             var scale = this.canvasOptions.scale;
 
@@ -434,7 +388,6 @@ var AzimuthRotator = {
 
             this.ctx.restore();
         },
-
         drawMinMax: function (heading) {
             var scale = this.canvasOptions.scale;
 
@@ -460,7 +413,6 @@ var AzimuthRotator = {
 
             this.ctx.restore();
         },
-
         drawOverlap: function (heading) {
             var scale = this.canvasOptions.scale;
 

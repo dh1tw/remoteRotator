@@ -72,7 +72,6 @@ var ElevationRotator = {
         this.canvas.removeEventListener("touchend", this.touchEndHandler);
     },
     methods: {
-
         // calculate the width of the heading needle (depends on the canvas size)
         headingNeedleWidth: function () {
             if (this.canvasSize > 100) {
@@ -80,7 +79,6 @@ var ElevationRotator = {
             }
             return 7
         },
-
         // calculate the width of the preset needle (depends on the canvas size)
         presetNeedleWidth: function () {
             if (this.canvasSize > 100) {
@@ -88,101 +86,77 @@ var ElevationRotator = {
             }
             return 3
         },
-
         // calculate the font size (depends on the canvas size)
         headingFont: function () {
             return "normal " + this.canvasSize / 15 + "pt Inconsolata";
         },
-
         mouseDownHandler: function (evt) {
             this.mouseDown = true;
         },
-
         mouseOutHandler: function (evt) {
+            // if the cursor moves out of the canvas, then
+            // ignore the preset
             this.mouseDown = false;
             this.internalPreset = this.preset;
             this.drawRotator(this.heading, this.internalPreset);
         },
-
         mouseMoveHandler: function (evt) {
-
             // only proceed when the left button is pressed
             if (evt.buttons !== 1) {
                 return
             }
-
-            var p = this.getCursorPosAngle(this.canvas, evt);
-
-            // only values between min and max are allowed
-            if (p > this.max && p <= 270) {
-                p = this.max;
-            } else if (p > 270) {
-                p = this.min;
-            } else if (p < this.min) {
-                p = this.min;
-            }
-            
-            // no need to redraw
-            if (p === this.internalPreset) {
-                return
-            }
-            
-            this.internalPreset = p;
-           
-            this.drawRotator(this.heading, this.internalPreset);
+            this.calculatePreset(evt);
         },
-        
         mouseUpHandler: function (evt) {
             this.mouseDown = false;
+            this.calculatePreset(evt);
             this.$emit('set-elevation', this.name, Math.round(this.internalPreset, 0));
         },
-
-        touchStartHandler: function(evt) {
+        touchStartHandler: function (evt) {
             this.touchOngoing = true;
         },
-        touchMoveHandler: function(evt) {
-            // only proceed when the left button is pressed
-            
-            var p = this.getCursorPosAngle(this.canvas, evt);
-
-            // only values between min and max are allowed
-            if (p > this.max && p <= 270) {
-                p = this.max;
-            } else if (p > 270) {
-                p = this.min;
-            } else if (p < this.min) {
-                p = this.min;
-            }
-            
-            // no need to redraw
-            if (p === this.internalPreset) {
-                return
-            }
-            
-            this.internalPreset = p;
-            
-            this.drawRotator(this.heading, this.internalPreset);
+        touchMoveHandler: function (evt) {
+            this.calculatePreset(evt);
         },
-        touchEndHandler: function(evt) {
+        touchEndHandler: function (evt) {
             this.touchOngoing = false;
             this.$emit('set-elevation', this.name, Math.round(this.internalPreset, 0));
         },
+        calculatePreset: function (evt) {
+            var p = this.getCursorPosAngle(this.canvas, evt);
 
-        getCursorPosition: function(canvas, evt){
+            // only values between min and max are allowed
+            if (p > this.max && p <= 270) {
+                p = this.max;
+            } else if (p > 270) {
+                p = this.min;
+            } else if (p < this.min) {
+                p = this.min;
+            }
+
+            // no need to redraw
+            if (p === this.internalPreset) {
+                return
+            }
+
+            this.internalPreset = p;
+
+            this.drawRotator(this.heading, this.internalPreset);
+        },
+        getCursorPosition: function (canvas, evt) {
             var rect = canvas.getBoundingClientRect();
-            if ("touches" in evt){ // only touch events have the property 'touches'
+            if ("touches" in evt) { // only touch events have the property 'touches'
                 return {
                     x: evt.touches[0].clientX - rect.left,
                     y: evt.touches[0].clientY - rect.top
                 }
-            } 
-            
-            return { // must be a mouse event
-                    x: evt.clientX - rect.left,
-                    y: evt.clientY - rect.top
+            }
+
+            return { // must be a mouse event 
+                x: evt.clientX - rect.left,
+                y: evt.clientY - rect.top
             }
         },
-
         getCursorPosAngle: function (canvas, evt) {
             var cursorPos = this.getCursorPosition(this.canvas, evt);
             var dx = cursorPos.x - this.canvas.width / 2;
@@ -191,7 +165,6 @@ var ElevationRotator = {
 
             return angle;
         },
-
         // draw the heading and preset.
         // heading (Number)
         // preset (Number)
@@ -206,17 +179,16 @@ var ElevationRotator = {
             this.drawCompass();
 
             this.drawHeadingNeedle(heading);
-            
-            if ((Math.round(preset) == heading) && !this.isTurning){
+
+            if ((Math.round(preset) == heading) && !this.isTurning) {
                 return
             }
-            
-            if (this.isTurning || this.mouseDown || this.touchOngoing ) {
+
+            if (this.isTurning || this.mouseDown || this.touchOngoing) {
                 this.drawPreset(preset, this.internalPresetOptions);
             }
 
         },
-
         // draw the base a compass ring with 45° ticks
         drawCompass() {
 
@@ -295,7 +267,6 @@ var ElevationRotator = {
                 this.ctx.fillText(txt, cx - 33 * this.canvasOptions.scale, (cy / 2) + this.ctx.measureText(h).width / 2);
             }
         },
-
         drawHeadingNeedle: function (heading) {
 
             var scale = this.canvasOptions.scale;
@@ -346,7 +317,6 @@ var ElevationRotator = {
             this.ctx.fill();
             this.ctx.closePath();
         },
-
         drawPreset: function (degrees) {
             var scale = this.canvasOptions.scale;
 
@@ -379,7 +349,6 @@ var ElevationRotator = {
 
             this.ctx.restore();
         },
-
         drawMinMax: function (heading) {
             var scale = this.canvasOptions.scale;
 
@@ -406,7 +375,6 @@ var ElevationRotator = {
             this.ctx.restore();
         },
     },
-
     watch: {
         heading: function () {
             this.drawRotator(this.heading, this.internalPreset);
