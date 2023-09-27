@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"net"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/dh1tw/remoteRotator/rotator"
 )
 
+// EA4TX 27/9/2023
 // Yaesu is the implementation of the Yaesu GS232A/B rotator protocol
 type Yaesu struct {
 	sync.RWMutex
@@ -79,21 +82,45 @@ func New(opts ...func(*Yaesu)) (*Yaesu, error) {
 		opt(r)
 	}
 
-	config := &serial.Config{
-		Name:        r.spPortName,
-		Baud:        r.spBaudrate,
-		ReadTimeout: time.Millisecond * 100,
-		Parity:      serial.ParityNone,
-		Size:        8,
-		StopBits:    1,
+	// Old code here
+	//config := &serial.Config{
+	//	Name:        r.spPortName,
+	//	Baud:        r.spBaudrate,
+	//	ReadTimeout: time.Millisecond * 100,
+	//	Parity:      serial.ParityNone,
+	//	Size:        8,
+	//	StopBits:    1,
+	//}
+
+	// New code here (EA4TX)
+	if strings.Contains(r.spPortName, ":") {
+		tcpConn, err := net.Dial("tcp", r.spPortName)
+		if err != nil {
+			return nil, err
+		}
+		r.sp = tcpConn
+	} else {
+		spConfig := &serial.Config{
+			Name:        r.spPortName,
+			Baud:        r.spBaudrate,
+			ReadTimeout: time.Second,
+			Parity:      serial.ParityNone,
+			Size:        8,
+			StopBits:    1,
+		}
+		sp, err := serial.OpenPort(spConfig)
+		if err != nil {
+			return nil, err
+		}
+		r.sp = sp
 	}
 
-	sp, err := serial.OpenPort(config)
-	if err != nil {
-		return nil, err
-	}
-
-	r.sp = sp
+	// Old code here
+	// sp, err := serial.OpenPort(config)
+	// if err != nil {
+	//		return nil, err
+	//}
+	//r.sp = sp
 
 	go r.start()
 
