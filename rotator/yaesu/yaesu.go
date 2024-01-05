@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"net"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -53,7 +55,7 @@ type Yaesu struct {
 // functional options.
 // Default settings are:
 // hasAzimuth: true,
-// portname: /dev/ttyACM0,
+// portname: /dev/ttyACM0 (or 127.0.0.1:6001),
 // pollingInterval: 5sec,
 // baudrate: 9600.
 func New(opts ...func(*Yaesu)) (*Yaesu, error) {
@@ -78,22 +80,28 @@ func New(opts ...func(*Yaesu)) (*Yaesu, error) {
 	for _, opt := range opts {
 		opt(r)
 	}
-
-	config := &serial.Config{
-		Name:        r.spPortName,
-		Baud:        r.spBaudrate,
-		ReadTimeout: time.Millisecond * 100,
-		Parity:      serial.ParityNone,
-		Size:        8,
-		StopBits:    1,
+	
+	if strings.Contains(r.spPortName, ":") {
+		tcpConn, err := net.Dial("tcp", r.spPortName)
+		if err != nil {
+			return nil, err
+		}
+		r.sp = tcpConn
+	} else {
+		spConfig := &serial.Config{
+			Name:        r.spPortName,
+			Baud:        r.spBaudrate,
+			ReadTimeout: time.Second,
+			Parity:      serial.ParityNone,
+			Size:        8,
+			StopBits:    1,
+		}
+		sp, err := serial.OpenPort(spConfig)
+		if err != nil {
+			return nil, err
+		}
+		r.sp = sp
 	}
-
-	sp, err := serial.OpenPort(config)
-	if err != nil {
-		return nil, err
-	}
-
-	r.sp = sp
 
 	go r.start()
 
