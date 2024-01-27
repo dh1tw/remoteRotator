@@ -2,9 +2,11 @@ package yaesu
 
 import (
 	"bytes"
+	"reflect"
 	"regexp"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/dh1tw/remoteRotator/rotator"
 )
@@ -29,8 +31,6 @@ func (p *dummyPort) Flush() error {
 }
 
 func (p *dummyPort) Close() error {
-	p.rxBuf = nil
-	p.sendBuf = nil
 	return nil
 }
 
@@ -106,7 +106,7 @@ func TestSetAzimuth(t *testing.T) {
 				t.Fatalf("unable to set azimuth to %v; got error: %q", tc.name, err)
 			}
 			res := dp.sendBuf.Bytes()
-			if bytes.Compare(tc.expMsg, res) != 0 {
+			if !bytes.Equal(tc.expMsg, res) {
 				t.Fatalf("expecting '%s' (Hex: % 02x) to be sent to the serial port. Instead got '%s' (Hex: % 02x)",
 					replaceLineBreaks(tc.expMsg),
 					replaceLineBreaks(tc.expMsg),
@@ -180,7 +180,7 @@ func TestSetElevation(t *testing.T) {
 				t.Fatalf("unable to set elevation to %v; got error: %q", tc.name, err)
 			}
 			res := dp.sendBuf.Bytes()
-			if bytes.Compare(tc.expMsg, res) != 0 {
+			if !bytes.Equal(tc.expMsg, res) {
 				t.Fatalf("expecting '%s' (Hex: % 02x) to be sent to the serial port. Instead got '%s' (Hex: % 02x)",
 					replaceLineBreaks(tc.expMsg),
 					replaceLineBreaks(tc.expMsg),
@@ -255,7 +255,7 @@ func TestRotatorStop(t *testing.T) {
 					t.Fatalf("unable to %v", tc.name)
 				}
 
-				if bytes.Compare(dp.sendBuf.Bytes(), tc.expMsg) != 0 {
+				if !bytes.Equal(dp.sendBuf.Bytes(), tc.expMsg) {
 					send := replaceLineBreaks(dp.sendBuf.Bytes())
 					exp := replaceLineBreaks(tc.expMsg)
 					t.Fatalf("expecting '%s' (Hex: % 02x) to be sent to the serial port. Instead got '%s' (Hex: % 02x)",
@@ -271,7 +271,7 @@ func TestRotatorStop(t *testing.T) {
 					t.Fatalf("unable to %v", tc.name)
 				}
 
-				if bytes.Compare(dp.sendBuf.Bytes(), tc.expMsg) != 0 {
+				if !bytes.Equal(dp.sendBuf.Bytes(), tc.expMsg) {
 					send := replaceLineBreaks(dp.sendBuf.Bytes())
 					exp := replaceLineBreaks(tc.expMsg)
 					t.Fatalf("expecting '%s' (Hex: % 02x) to be sent to the serial port. Instead got '%s' (Hex: % 02x)",
@@ -286,7 +286,7 @@ func TestRotatorStop(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				if bytes.Compare(dp.sendBuf.Bytes(), tc.expMsg) != 0 {
+				if !bytes.Equal(dp.sendBuf.Bytes(), tc.expMsg) {
 					send := replaceLineBreaks(dp.sendBuf.Bytes())
 					exp := replaceLineBreaks(tc.expMsg)
 					t.Fatalf("expecting '%s' (Hex: % 02x) to be sent to the serial port. Instead got '%s' (Hex: % 02x)",
@@ -306,38 +306,117 @@ func TestRotatorStop(t *testing.T) {
 
 func TestParseMsg(t *testing.T) {
 
-	bothCb := func(r rotator.Rotator, h rotator.Heading) {
-
-		if h.Azimuth <= 0 {
-			t.Fatalf("expected value must be > 0, got %v", h.Azimuth)
-		}
-		if h.Elevation < 0 {
-			t.Fatalf("expected value must be > 0, got %v", h.Elevation)
-		}
-	}
-
 	tt := []struct {
-		name      string
-		input     string
-		evHandler func(rotator.Rotator, rotator.Heading)
+		name          string
+		input         string
+		azInitialized bool
+		elInitialized bool
+		azimuth       int
+		elevation     int
+		updateNeeded  bool
 	}{
-		{"azimuth", "+0030", bothCb},
-		{"elevation", "+0030+0090", bothCb},
-		{"prompt", "?>", nil},
-		{"garbage", "der43$§PkoJOIo;\n\r", nil},
+		{"azimuth - not initialized", "+0030", false, false, 0, 0, true},
+		{"azimuth - not initialized but same position", "+0030", false, false, 30, 0, true},
+		{"azimuth - initialized and new position", "+0030", true, false, 45, 0, true},
+		{"azimuth - initialized and same position - no update needed", "+0030", true, false, 30, 0, false},
+		{"azimuth and elevation - not initialized", "+0030+0090", false, false, 20, 30, true},
+		{"azimuth and elevation - initialized and new position", "AZ=030 EL=090", true, true, 10, 0, true},
+		{"azimuth and elevation - initialized but same position - no update needed", "AZ=030 EL=090", true, true, 30, 90, false},
+		{"prompt", "?>", true, true, 0, 0, false},
+		{"garbage", "der43$§PkoJOIo;\n\r", true, true, 0, 0, false},
 	}
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			headingPattern, err := regexp.Compile("[\\d]{4}")
-			if err != nil {
-				t.Fatalf(err.Error())
+
+			doneCh := make(chan struct{})
+
+			updateCb := func(rotator.Rotator, rotator.Heading) {
+				close(doneCh)
 			}
+
 			yaesu := &Yaesu{
-				eventHandler:   tc.evHandler,
-				headingPattern: headingPattern,
+				eventHandler:         updateCb,
+				azInitialized:        tc.azInitialized,
+				elInitialized:        tc.elInitialized,
+				azimuth:              tc.azimuth,
+				elevation:            tc.elevation,
+				headingPatternGS232A: getProtocolRegExp("GS232A", t),
+				headingPatternGS232B: getProtocolRegExp("GS232B", t),
 			}
+
 			yaesu.parseMsg(tc.input)
+			updateCalled := false
+
+			select {
+			case <-doneCh:
+				updateCalled = true
+			case <-time.After(time.Millisecond * 100):
+				updateCalled = false
+			}
+
+			// ensure the eventHandler / updateCallback only get's executed
+			// when needed
+			if updateCalled != tc.updateNeeded {
+				t.Fatalf("failure in callback execution")
+			}
+
+		})
+	}
+}
+
+func TestParseGS232A(t *testing.T) {
+
+	tt := []struct {
+		name   string
+		input  string
+		output map[string]int
+	}{
+		{"azimuth", "+0030", map[string]int{"azimuth": 30}},
+		{"azimuth and elevation", "+0030+0090", map[string]int{"azimuth": 30, "elevation": 90}},
+		{"azimuth GS232B", "AZ=040", map[string]int{}},
+		{"prompt", "?>", map[string]int{}},
+		{"garbage", "der43$§PkoJOIo;\n\r", map[string]int{}},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			yaesu := &Yaesu{
+				headingPatternGS232A: getProtocolRegExp("GS232A", t),
+			}
+			res := yaesu.parseGS232A(tc.input)
+			if !reflect.DeepEqual(res, tc.output) {
+				t.Fatalf("GS232A parser error. expected %v, but got %v", tc.output, res)
+			}
+		})
+	}
+}
+
+func TestParseGS232B(t *testing.T) {
+
+	tt := []struct {
+		name   string
+		input  string
+		output map[string]int
+	}{
+		{"azimuth", "AZ=030", map[string]int{"azimuth": 30}},
+		{"elevation", "EL=090", map[string]int{"elevation": 90}},
+		{"azimuth and elevation", "AZ=030 EL=090", map[string]int{"azimuth": 30, "elevation": 90}},
+		{"azimuth and elevation wide spacing", "AZ=030    EL=090", map[string]int{"azimuth": 30, "elevation": 90}},
+		{"azimuth GS232A", "+0030", map[string]int{}},
+		{"prompt", "?>", map[string]int{}},
+		{"garbage", "der43$§PkoJOIo;\n\r", map[string]int{}},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			yaesu := &Yaesu{
+				headingPatternGS232B: getProtocolRegExp("GS232B", t),
+			}
+			res := yaesu.parseGS232B(tc.input)
+			if !reflect.DeepEqual(res, tc.output) {
+				t.Fatalf("GS232B parser error. expected %v, but got %v", tc.output, res)
+			}
 		})
 	}
 }
@@ -358,7 +437,7 @@ func TestQuery(t *testing.T) {
 
 	value := dp.sendBuf.Bytes()
 	expValue := []byte("C2\r\n")
-	if bytes.Compare(value, expValue) != 0 {
+	if !bytes.Equal(value, expValue) {
 		v := replaceLineBreaks(value)
 		exp := replaceLineBreaks(expValue)
 		t.Fatalf("expected '%s', got %s", exp, v)
@@ -423,4 +502,26 @@ func TestNewYaesuPortNotExist(t *testing.T) {
 			}
 		})
 	}
+}
+
+func getProtocolRegExp(rotType string, t *testing.T) *regexp.Regexp {
+
+	var pattern *regexp.Regexp = nil
+
+	switch rotType {
+	case "GS232A":
+		p, err := regexp.Compile(`\+[\d]{4}`)
+		if err != nil {
+			t.Fatal("unable to compile gs232 regexp")
+		}
+		pattern = p
+	case "GS232B":
+		p, err := regexp.Compile(`((AZ)|(EL))=[\d]{3}`)
+		if err != nil {
+			t.Fatal("unable to compile gs232 regexp")
+		}
+		pattern = p
+	}
+
+	return pattern
 }
