@@ -8,27 +8,29 @@
 
 [![Alt text](https://i.imgur.com/lcHhslZ.png "remoteRotator WebUI")](https://demo.rotator.shackbus.org)
 
-remoteRotator is a command line application which makes your azimuth / elevation
-antenna rotators available on the network. It available for Linux/Windows/MacOS and written in the programing language [Go](https://golang.org).
+remoteRotator is a command line application that makes your azimuth / elevation antenna rotators available on the network. 
+It is available for Linux/Windows/MacOS and is written in the programming language [Go](https://golang.org).
 
 To get a first impression, you're welcome to play with our public demo at [demo.rotator.shackbus.org](https://demo.rotator.shackbus.org).
 
-**ADVICE**: This project is **under development**. The parameters and the ICD
-are still **not stable** and subject to change until the first major version
-has been reached.
 ## Supported Rotators
 
-This is a list of rotator controllers which are known to work well with remoteRotator.
+remoteRotator supports the following protocols:
+- [Yaesu GS-232A](https://www.yaesu.com/downloadFile.cfm?FileID=820&FileCatID=155&FileName=GS232A.pdf&FileContentType=application%2Fpdf)
+- [Yaesu GS-232B](https://www.passion-radio.com/index.php?controller=attachment&id_attachment=782)
 
-- [Yaesu GS232A](http://www.yaesu.com/indexVS.cfm?cmd=DisplayProducts&ProdCatID=104&encProdID=79A89CEC477AA3B819EE02831F3FD5B8)
+This is a list of rotator controllers that are known to work well with remoteRotator:
+- [Yaesu Control Interfaces](https://www.yaesu.com/downloadFile.cfm?FileID=820&FileCatID=155&FileName=GS232A.pdf&FileContentType=application%2Fpdf)
 - [K3NG Open Source Rotator Controller (implements Yaesu GS232A)](https://github.com/k3ng/k3ng_rotator_controller)
 - [RemoteQTH Azimuth Rotator Interface (K3NG firmware)](https://remoteqth.com/single-rotator-interface.php)
 - [EA4TX ARS (implements Yaesu GS232A)](https://ea4tx.com/en/)
 - [ERC Easy-Rotator-Control (implements Yaesu GS232A)](https://www.schmidt-alba.de/eshop/)
+- [CG Antenna RTC-200 (implements Yaesu GS232B)](https://www.cgantenna.be/product_rtc200.html)
 - Dummy rotator (great for playing around with remoteRotator)
 
 If your rotator controller is not supported, feel free to open an [issue](https://github.com/dh1tw/remoteRotator/issues).
 It is relatively easy to add more rotator controllers / protocols.
+
 ## Supported Transportation Protocols
 
 - [NATS](https://nats.io) (preferred)
@@ -49,7 +51,7 @@ You can download a tarball / zip archive with the compiled binary for
  from the [releases](https://github.com/dh1tw/remoteRotator/releases) page.
 
 remoteRotator works well on SoC boards like the Raspberry / Orange / Banana Pis.
-The application is a self contained single executable.
+The application is just a single executable.
 
 ## Dependencies
 
@@ -85,7 +87,7 @@ Use "remoteRotator [command] --help" for more information about a command.
 
 So let's fire up a remoteRotator server for your rotator:
 
-First, identify the serial port to which your rotator is connected. On Windows
+First, identify the serial port to which your rotator is connected. On Windows,
 this will be something like `COMx` (e.g. `COM3`), on Linux / MacOS it will be
 a device in the `/dev/` folder (e.g. `/dev/ttyACM0`).
 
@@ -102,7 +104,7 @@ By default, the rotator will only be listening on the loopback adapter. In
 order to make it available and discoverable on the local network, a network
 connected adapter has to be selected.
 
-remoteRotator supports access via TCP, emulating the Yaesu GS232 protocol
+remoteRotator supports access via TCP, emulating the Yaesu GS232A protocol
 (disabled by default) and through a web interface (HTTP + Websocket).
 
 You can select the following rotator types:
@@ -115,9 +117,8 @@ remoteRotator allows to assign a series of meta data to a rotator:
 3. Azimuth/Elevation maximum value
 4. Azimuth Mechanical stop
 
-These metadata enhance the rotators view (e.g. showing overlap) in the web
-interface and can also help to limit for example the rotators range if it does
-not support full 360°.
+The metadata enriches the rotator representation in the web interface 
+for example by colorizing the rotator range or indicating the mechanical stop.
 
 Usage:
   remoteRotator server lan [flags]
@@ -164,9 +165,9 @@ no config file found
 ## Connecting via TCP / Telnet
 
 If you have an application (e.g. [arsvcom](https://ea4tx.com/en/arsvcom/) or
-[pstrotator](http://www.qsl.net/yo3dmu/index_Page346.htm)) which can talk to
+[pstrotator](http://www.qsl.net/yo3dmu/index_Page346.htm)) that can talk to
 a Yaesu compatible rotator, you can point that application to remoteRotator's
-builtin TCP server (although disabled by default).
+built-in TCP server (although disabled by default).
 
 Let's start a dummy rotator instance on Linux and enable the build-in TCP
 server:
@@ -216,13 +217,13 @@ You can specify the host and port in the settings above, or deactivate the
 built-in webserver if you don't need it.
 
 The red arrow indicates the heading of the rotator and the yellow arrow
-indicates the preset value to which the rotator will turn to. The yellow arrow
+indicates the preset value to which the rotator will turn. The yellow arrow
 disappears when the desired direction has been reached.
 
 The dotted red line indicates the mechanical stop of the rotator.
 A green arc segment indicates a limited turning radius for this rotator.
 A blue arc segment indicates the mechanical overlap supported by this rotator.
-These indicators are just visual helpers and are configurable though command line
+These indicators are just visual helpers and are configurable through command line
 flags or in the config file.
 
 ## Web Interface (Aggregator)
@@ -243,7 +244,7 @@ or NATS. The discovery functionality doesn't require any configuration.
 
 ## Config file
 
-The repository contains an example configuration file. By convention it is called
+The repository contains an example configuration file. By convention, it is called
 `.remoteRotator.[yaml|toml|json]` and is located by default either in the
 home directory or the directory where the remoteRotator executable is located.
 The format of the file can either be in
@@ -269,14 +270,14 @@ If an error occurs from which remoteRotator can not recover, the application
 exits. This typically happens when the connection with the rotator has been
 lost or if the rotator is not responding anymore.
 It is recommended to execute remoteRotator as a service under the supervision
-of a scheduler like [systemd](https://en.wikipedia.org/wiki/Systemd).
+of a scheduler, like [systemd](https://en.wikipedia.org/wiki/Systemd).
 
 ## Bug reports, Questions & Pull Requests
 
 Please use the Github [Issue tracker](https://github.com/dh1tw/remoteRotator/issues)
 to report bugs and ask questions! If you would like to contribute to remoteRotator,
 [pull requests](https://help.github.com/articles/creating-a-pull-request/) are
-welcome! However please consider to provide unit tests with the PR to verify
+welcome! However please consider providing unit tests with the PR to verify
 the proper behavior.
 
 If you file a bug report, please include always the version of remoteRotator
@@ -293,16 +294,13 @@ remoteRotator Version: v0.6.0, darwin/arm64, BuildDate: 2021-04-18T03:35:42+02:0
 
 ## Documentation
 
-The auto generated documentation can be found at
+The auto-generated documentation can be found at
 [pkg.go.dev](https://pkg.go.dev/github.com/dh1tw/remoteRotator).
 
 ## How to build
 
-In order to compile remoteRotator from the sources, you need to have
+To compile remoteRotator from the sources, you need to have
 [Go >= 1.16](https://golang.org) installed and configured.
-
-It is assumed that the variables `$GOPATH` is set and that `$GOPATH\bin` is
-added to your `$PATH` environment variable.
 
 Install the dependencies if you haven't already
 
@@ -310,7 +308,7 @@ Install the dependencies if you haven't already
 $ sudo apt-get install git build-essential upx
 ```
 
-This his how to download, prepare and compile remoteRotator under Linux/MacOS:
+Download, prepare and compile remoteRotator under Linux/MacOS:
 
 ``` bash
 $ mkdir -p $GOPATH/src/github.com/dh1tw && cd "$_"

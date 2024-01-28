@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 jobs:
   build_linux:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         version: ['linux-arm', 'linux-386', 'linux-amd64', 'windows-386', 'windows-amd64']
@@ -27,14 +27,14 @@ jobs:
             GOARCH: amd64
     steps:
     -
-      name: Set up Go 1.17
-      uses: actions/setup-go@v1
+      name: Set up Go 1.21
+      uses: actions/setup-go@v4
       id: go
       with:
-        go-version: 1.17
+        go-version: 1.21
     -
       name: Checkout source code
-      uses: actions/checkout@v1
+      uses: actions/checkout@v4
       with:
         submodules: true
     -
@@ -85,14 +85,14 @@ jobs:
             GOARCH: arm64
     steps:
     -
-      name: Set up Go 1.17
-      uses: actions/setup-go@v1
+      name: Set up Go 1.21
+      uses: actions/setup-go@v4
       id: go
       with:
-        go-version: 1.17
+        go-version: 1.21
     -
       name: Checkout source code
-      uses: actions/checkout@v1
+      uses: actions/checkout@v4
       with:
         submodules: true
     -
@@ -132,17 +132,17 @@ jobs:
         path: ./release
 
   test_linux:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     -
-      name: Set up Go 1.17
-      uses: actions/setup-go@v1
+      name: Set up Go 1.21
+      uses: actions/setup-go@v4
       id: go
       with:
-        go-version: 1.17
+        go-version: 1.21
     -
       name: Checkout source code
-      uses: actions/checkout@v1
+      uses: actions/checkout@v4
       with:
         submodules: true
     -
@@ -170,14 +170,14 @@ jobs:
     # runs-on: macos-11.0
     steps:
     -
-      name: Set up Go 1.17
-      uses: actions/setup-go@v1
+      name: Set up Go 1.21
+      uses: actions/setup-go@v4
       id: go
       with:
-        go-version: 1.17
+        go-version: 1.21
     -
       name: Checkout source code
-      uses: actions/checkout@v1
+      uses: actions/checkout@v4
       with:
         submodules: true
     -
@@ -196,7 +196,7 @@ jobs:
   # A Github release is created whenever the git reference contains a tag, starting with 'v*' (e.g. v0.4.2)
   # And the previous build jobs have been successful
   create_release:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: [build_linux, build_macos, test_linux, test_macos]
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -226,7 +226,7 @@ jobs:
 
   # In this job we upload the release artifacts to the corresponding release
   upload:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: create_release # release must be created before this job can start
     strategy:
       matrix:

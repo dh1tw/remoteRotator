@@ -19,35 +19,35 @@ import (
 // Yaesu is the implementation of the Yaesu GS232A/B rotator protocol
 type Yaesu struct {
 	sync.RWMutex
-	name            string
-	azimuthMin      int
-	azimuthMax      int
-	azimuthStop     int
-	azimuthOverlap  bool
-	elevationMin    int
-	elevationMax    int
-	azimuth         int
-	azPreset        int
-	elevation       int
-	elPreset        int
-	hasAzimuth      bool
-	hasElevation    bool
-	azInitialized   bool
-	elInitialized   bool
-	pollingInterval time.Duration
-	pollingTicker   *time.Ticker
-	eventHandler    func(rotator.Rotator, rotator.Heading)
-	sp              io.ReadWriteCloser
-	spRead          sync.Mutex
-	spWrite         sync.Mutex
-	spPortName      string
-	spBaudrate      int
-	closeCh         chan struct{}
-	errorCh         chan struct{}
-	starter         sync.Once
-	closer          sync.Once
-	headingPattern  *regexp.Regexp
-	watchdogTs      time.Time
+	name                 string
+	azimuthMin           int
+	azimuthMax           int
+	azimuthStop          int
+	azimuthOverlap       bool
+	elevationMin         int
+	elevationMax         int
+	azimuth              int
+	azPreset             int
+	elevation            int
+	elPreset             int
+	hasAzimuth           bool
+	hasElevation         bool
+	azInitialized        bool
+	elInitialized        bool
+	pollingInterval      time.Duration
+	pollingTicker        *time.Ticker
+	eventHandler         func(rotator.Rotator, rotator.Heading)
+	sp                   io.ReadWriteCloser
+	spRead               sync.Mutex
+	spWrite              sync.Mutex
+	spPortName           string
+	spBaudrate           int
+	closeCh              chan struct{}
+	errorCh              chan struct{}
+	closer               sync.Once
+	headingPatternGS232A *regexp.Regexp
+	headingPatternGS232B *regexp.Regexp
+	watchdogTs           time.Time
 }
 
 // New creates a new Yaesu object which satisfies implicitly the
@@ -60,27 +60,34 @@ type Yaesu struct {
 // baudrate: 9600.
 func New(opts ...func(*Yaesu)) (*Yaesu, error) {
 
-	// regex Pattern [0-9]{4} -> 0310..etc
-	headingPattern, err := regexp.Compile("[\\d]{4}")
+	// regex Pattern for the az&el position as per GS232A
+	headingPattern232A, err := regexp.Compile(`\+[\d]{4}`)
+	if err != nil {
+		return nil, err
+	}
+
+	// regex Pattern for the az&el position as per GS232B
+	headingPattern232B, err := regexp.Compile(`((AZ)|(EL))=[\d]{3}`)
 	if err != nil {
 		return nil, err
 	}
 
 	r := &Yaesu{
-		hasAzimuth:      true,
-		pollingInterval: time.Second * 5,
-		spPortName:      "/dev/ttyACM0",
-		spBaudrate:      9600,
-		headingPattern:  headingPattern,
-		azimuthMax:      450,
-		elevationMax:    180,
-		closeCh:         make(chan struct{}),
+		hasAzimuth:           true,
+		pollingInterval:      time.Second * 5,
+		spPortName:           "/dev/ttyACM0",
+		spBaudrate:           9600,
+		headingPatternGS232A: headingPattern232A,
+		headingPatternGS232B: headingPattern232B,
+		azimuthMax:           450,
+		elevationMax:         180,
+		closeCh:              make(chan struct{}),
 	}
 
 	for _, opt := range opts {
 		opt(r)
 	}
-	
+
 	if strings.Contains(r.spPortName, ":") {
 		tcpConn, err := net.Dial("tcp", r.spPortName)
 		if err != nil {
@@ -140,10 +147,7 @@ func (r *Yaesu) resetWatchdog() {
 func (r *Yaesu) checkWatchdog() bool {
 	r.Lock()
 	defer r.Unlock()
-	if time.Since(r.watchdogTs) > 5*r.pollingInterval {
-		return true
-	}
-	return false
+	return time.Since(r.watchdogTs) > 5*r.pollingInterval
 }
 
 // Start the main event loop for the serial port.
@@ -220,7 +224,8 @@ func (r *Yaesu) poll() {
 func (r *Yaesu) read() (string, error) {
 	r.spRead.Lock()
 	defer r.spRead.Unlock()
-	return bufio.NewReader(r.sp).ReadString('\n')
+	a, b := bufio.NewReader(r.sp).ReadString('\n')
+	return a, b
 }
 
 // request Azimuth + Elevation from Yaesu rotator
@@ -241,20 +246,23 @@ func (r *Yaesu) write(data []byte) (int, error) {
 // and then further stores them and executes the event callback
 func (r *Yaesu) parseMsg(msg string) {
 
-	headings := []string{}
 	gotNewValue := false
 
-	if r.headingPattern != nil {
-		headings = r.headingPattern.FindAllString(msg, -1)
+	res := r.parseGS232A(msg)
+	if len(res) == 0 {
+		res = r.parseGS232B(msg)
+	}
+
+	if len(res) == 0 {
+		return
 	}
 
 	r.Lock()
 	defer r.Unlock()
 
-	if len(headings) > 0 {
-		//contains always 4 digits
-		az, _ := strconv.Atoi(headings[0][1:]) //discard the first digit, since it's always 0
-
+	az, ok := res["azimuth"]
+	if ok {
+		// on startup we initialize azPreset with the current azimuth position
 		if !r.azInitialized {
 			r.azPreset = az
 			r.azInitialized = true
@@ -267,10 +275,9 @@ func (r *Yaesu) parseMsg(msg string) {
 		}
 	}
 
-	if len(headings) == 2 {
-		// contains always 4 digits
-		el, _ := strconv.Atoi(headings[1][1:])
-
+	el, ok := res["elevation"]
+	if ok {
+		// on startup we initialize elPreset with the current elevation position
 		if !r.elInitialized {
 			r.elPreset = el
 			r.elInitialized = true
@@ -279,13 +286,70 @@ func (r *Yaesu) parseMsg(msg string) {
 		if r.elevation != el {
 			r.elevation = el
 		}
+	}
 
-		if r.eventHandler != nil && gotNewValue {
-			// cb launched async to avoid deadlock on yaesu.*()
-			heading := r.serialize().Heading
-			go r.eventHandler(r, heading)
+	if r.eventHandler != nil && gotNewValue {
+		// cb launched async to avoid deadlock on yaesu.*()
+		heading := r.serialize().Heading
+		go r.eventHandler(r, heading)
+	}
+}
+
+func (r *Yaesu) parseGS232A(msg string) map[string]int {
+
+	headings := []string{}
+
+	result := make(map[string]int)
+
+	if r.headingPatternGS232A != nil {
+		headings = r.headingPatternGS232A.FindAllString(msg, -1)
+	}
+
+	if len(headings) == 0 {
+		return result
+	}
+
+	//contains at least azimuth (e.g. +0030)
+	az, _ := strconv.Atoi(headings[0][2:]) //discard the first two characters
+
+	result["azimuth"] = az
+
+	// azimuth + elevation (e.g. +0030+0050)
+	if len(headings) == 2 {
+
+		el, _ := strconv.Atoi(headings[1][2:]) // discard the the first characters
+		result["elevation"] = el
+	}
+
+	return result
+}
+
+func (r *Yaesu) parseGS232B(msg string) map[string]int {
+
+	headings := []string{}
+
+	result := make(map[string]int)
+
+	if r.headingPatternGS232B != nil {
+		headings = r.headingPatternGS232B.FindAllString(msg, -1)
+	}
+
+	if len(headings) == 0 {
+		return result
+	}
+
+	for _, heading := range headings {
+
+		if heading[0:3] == "AZ=" { //contains azimuth (e.g. AZ=030)
+			az, _ := strconv.Atoi(heading[3:6])
+			result["azimuth"] = az
+		} else if heading[0:3] == "EL=" { //contains elevation (e.g. EL=090)
+			el, _ := strconv.Atoi(heading[3:6])
+			result["elevation"] = el
 		}
 	}
+
+	return result
 }
 
 // Name returns the name of the rotator

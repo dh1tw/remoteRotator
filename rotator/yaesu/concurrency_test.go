@@ -185,11 +185,3 @@ func randomAccess(r *Yaesu, timeout time.Duration, c *apiCallCounter,
 		}
 	}
 }
-
-// input range 0...500
-func randBool(v int) bool {
-	if v > 250 {
-		return true
-	}
-	return false
-}
