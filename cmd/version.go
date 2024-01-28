@@ -28,7 +28,7 @@ func init() {
 
 func printVersion() {
 	buildDate := time.Now().Format(time.RFC3339)
-	fmt.Println("copyright Tobias Wellnitz, DH1TW, 2020")
+	fmt.Printf("copyright Tobias Wellnitz, DH1TW (%d)\n", time.Now().Year())
 	fmt.Printf("remoteRotator Version: %s, %s/%s, BuildDate: %s, Commit: %s\n",
 		version, runtime.GOOS, runtime.GOARCH, buildDate, commitHash)
 }
