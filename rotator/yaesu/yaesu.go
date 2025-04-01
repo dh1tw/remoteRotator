@@ -281,10 +281,12 @@ func (r *Yaesu) parseMsg(msg string) {
 		if !r.elInitialized {
 			r.elPreset = el
 			r.elInitialized = true
+			gotNewValue = true
 		}
 
 		if r.elevation != el {
 			r.elevation = el
+			gotNewValue = true
 		}
 	}
 
