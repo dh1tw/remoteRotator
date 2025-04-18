@@ -196,37 +196,6 @@ jobs:
       name: Test (with race condition detector)
       run: go test -v -race ./...
 
-  # A Github release is created whenever the git reference contains a tag, starting with 'v*' (e.g. v0.4.2)
-  # And the previous build jobs have been successful
-  create_release:
-    runs-on: ubuntu-22.04
-    needs: [build_linux, build_macos, test_linux, test_macos]
-    if: startsWith(github.ref, 'refs/tags/v')
-    steps:
-    -
-      name: Create Release
-      id: create_release
-      uses: actions/create-release@v1.0.0
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        draft: true
-        prerelease: false
-    -
-      # since jobs can not share any variables we have to copy the URL of the created Github release
-      # into a file and stash it as an artifact
-      name: Copy release URL into file
-      run: |
-        mkdir release
-        printf "%s" "${{ steps.create_release.outputs.upload_url }}" > release/url.txt
-    - name: Stash file containing the release URL as an artifact
-      uses: actions/upload-artifact@v1
-      with:
-        name: release-url
-        path: ./release
-
 # In this job we upload the release artifacts to the corresponding release
   create_release_and_upload:
     runs-on: ubuntu-24.04
