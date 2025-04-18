@@ -258,3 +258,15 @@ jobs:
       run: |
           RANDOM_DELAY=$(( ( RANDOM % 60 )  + 1 ))
           sleep $RANDOM_DELAY
+
+              # Finally upload the artifact to the corresponding release
+
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v2
+      with:
+        name: Release ${{ env.VERSION_TAG }}
+        draft: true
+        prerelease: false
+        files: |
+          ./remoteRotator-${{ env.VERSION_TAG }}-${{ matrix.OS }}-${{ matrix.ARCH }}.zip
