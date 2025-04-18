@@ -16,6 +16,6 @@ require (
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07
-	golang.org/x/net v0.23.0 // indirect
+	golang.org/x/net v0.38.0 // indirect
 	google.golang.org/protobuf v1.33.0
 )
