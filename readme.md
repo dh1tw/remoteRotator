@@ -11,7 +11,7 @@
 remoteRotator is a command line application that makes your azimuth / elevation antenna rotators available on the network. 
 It is available for Linux/Windows/MacOS and is written in the programming language [Go](https://golang.org).
 
-To get a first impression, you're welcome to play with our public demo at [demo.rotator.shackbus.org](https://demo.rotator.shackbus.org).
+To get a first impression, you're welcome to play with our public demo at [remoterotator-demo.dh1tw.de](https://remoterotator-demo.dh1tw.de).
 
 ## Supported Rotators
 
